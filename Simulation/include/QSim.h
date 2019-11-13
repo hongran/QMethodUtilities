@@ -27,7 +27,7 @@
 #define TIMEDECIMATION 60 // 2018 production run
 
 // simulator parameters
-#define NEMAX 5000 // max electrons per fill per calo
+#define NEMAX 1000 // max electrons per fill per calo
 #define NTMAX 6    // max threshold histograms
 
 //constants

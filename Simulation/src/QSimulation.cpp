@@ -8,8 +8,8 @@
 
 int main()
 {
-  QSimulation::QSim QSimulator(16,1,5500,32,-999,4,false,false);
-  QSimulator.Simulate(64);
+  QSimulation::QSim QSimulator(64,1,500,127,-999,4,false,false);
+  QSimulator.Simulate(1024);
   
   std::vector<double> QHist;
 
