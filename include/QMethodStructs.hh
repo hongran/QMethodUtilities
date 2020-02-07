@@ -21,9 +21,11 @@ struct QHistCrystalEvent_t
 
 struct QHistCaloEvent_t
 {
+  double Pedestal[NQBINSOUT]; 
   double Signal[NQBINSOUT];
   double SignalErr[NQBINSOUT]; 
   double CrystalHitEnergy[NQBINSOUT]; //Energy determined through crystalHit product
+  double Raw[NQBINSOUT]; 
   int BinTag[NQBINSOUT];// for each calo, tag = number of hits summing over all crystals for each bin
 };
 
@@ -32,6 +34,8 @@ struct QHistCrystalSum_t
   double Signal[NQBINSOUT]; 
   double SignalErr[NQBINSOUT]; 
   double CrystalHitEnergy[NQBINSOUT]; //Energy determined through crystalHit product
+  double Pedestal[NQBINSOUT]; 
+  double Raw[NQBINSOUT]; 
 };
 
 struct QHistCaloSum_t
@@ -39,6 +43,8 @@ struct QHistCaloSum_t
   double Signal[NQBINSOUT]; 
   double SignalErr[NQBINSOUT]; 
   double CrystalHitEnergy[NQBINSOUT]; //Energy determined through crystalHit product
+  double Pedestal[NQBINSOUT]; 
+  double Raw[NQBINSOUT]; 
 };
 
 struct QMethodInfo_t

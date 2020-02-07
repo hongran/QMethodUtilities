@@ -6,10 +6,12 @@ import matplotlib.pyplot as plt
 ROOTModulePath = os.getenv("QROOTDIR")
 InputDataPath = os.getenv("QINPUTDATADIR")
 OutputPath = os.getenv("QHISTOGRAMDIR")
-InputFileName = "MergedData9d_1030.root"
+InputFileName = "MergedData9d_1213.root"
 OutputFileName = "QHists9d.root"
+RebinFactor  = 2
 
-RecompileModules = True
+#RecompileModules = True
+RecompileModules = False
 
 #Build the histograms
 if RecompileModules:
@@ -27,7 +29,7 @@ from ROOT import QHistBuilder
 ROOT.gROOT.ProcessLine(".L {0}".format(QFitModule))
 from ROOT import QFit
 
-QHistBuilder(InputFileName,InputDataPath,OutputFileName,OutputPath)
+QHistBuilder(RebinFactor,InputFileName,InputDataPath,OutputFileName,OutputPath)
 
 HistFile = ROOT.TFile(OutputPath+"/"+OutputFileName,"read")
 
@@ -39,10 +41,10 @@ QVecCalos = []
 QVecCaloTimes = []
 
 for i in range(24):
-  QHistCalos.append(HistFile.Get(f"hCalo_{i:02d}"))
-  QHistCaloSmooths.append(HistFile.Get(f"hCaloSmooth_{i:02d}"))
-  QVecCalos.append(HistFile.Get(f"vCalo_{i:02d}"))
-  QVecCaloTimes.append(HistFile.Get(f"vCaloTime_{i:02d}"))
+  QHistCalos.append(HistFile.Get("hCalo_{:02d}".format(i)))
+  QHistCaloSmooths.append(HistFile.Get("hCaloSmooth_{:02d}".format(i)))
+  QVecCalos.append(HistFile.Get("vCalo_{:02d}".format(i)))
+  QVecCaloTimes.append(HistFile.Get("vCaloTime_{:02d}".format(i)))
 
 c1 = ROOT.TCanvas("c1","c1",0,0,1200,800)
 c1.Divide(6,4)
@@ -50,17 +52,10 @@ c1.Divide(6,4)
 for i in range(24):
   c1.cd(i+1)
   QHistCalos[i].Draw()
+  QHistCaloSmooths[i].SetLineColor(ROOT.kRed)
+  QHistCaloSmooths[i].Draw("same")
 
 c1.Update()
-
-c2 = ROOT.TCanvas("c2","c2",0,0,1200,800)
-c2.Divide(6,4)
-
-for i in range(24):
-  c2.cd(i+1)
-  QHistCaloSmooths[i].Draw()
-
-c2.Update()
 
 c3 = ROOT.TCanvas("c3","c3",0,0,800,600)
 
@@ -70,13 +65,25 @@ c3.Update()
 print("Start Fitting...")
 QFitter = QFit()
 
-fFit = QFitter.Fit(QHistSmoothTotal,38,260,"f5ParFit")
+fFit = QFitter.Fit(QHistSmoothTotal,61,260,"f5ParFit")
 
 fFit.Draw("same")
 
 c3.Update()
 
+hRes = QFitter.GetResidual()
+hResFFT = QFitter.GetResidualFFT()
+
+c4 = ROOT.TCanvas("c4","c4",0,0,1200,600)
+c4.Divide(2,1)
+c4.cd(1)
+hRes.Draw()
+c4.cd(2)
+hResFFT.Draw()
+
 #fig = plt.figure()
 #plt.plot(QVecCaloTimes[0],QVecCalos[0],'ol')
 #plt.show()
+
+c4.Update()
 

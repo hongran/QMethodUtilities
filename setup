@@ -1,6 +1,7 @@
 export QROOTDIR=/Users/hongran/UKy/QMethodUtilities/root
 export QPYTHONDIR=/Users/hongran/UKy/QMethodUtilities/python
 export QINPUTDATADIR=/Users/hongran/ExpDataLocal
+export QRAWINPUTDATADIR=/Volumes/MacBackup/gm2QData/Tier1
 export QHISTOGRAMDIR=/Users/hongran/ExpDataLocal/Hist
 export LD_LIBRARY_PATH=/Users/hongran/UKy/QMethodUtilities/root:$LD_LIBRARY_PATH
 

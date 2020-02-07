@@ -182,7 +182,7 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
        tick = t/nsPerTick;                                      // convert from ns to Q-method histogram bin units
        int itick = (int)tick; // q-method histogram bin from decay time in bin units
        if ( itick  >= fill_buffer_max_length ) continue; // time out-of-bounds 
-       
+     
        // get positron lab energy, Elab, by generating the positron energy, angle distribution in muon rest frame
        y = curand_uniform(&localState);
        A = (-8.0*y*y + y + 1.)/( y*y - 5.*y - 5.);
@@ -225,10 +225,9 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
        tick = tick + drifttime; // add drift time to decay time
        itick = (int)tick;
 
-       /*** make energy arrays of true energy of each hit (not individual xtal energies) for diagnostics ***/
        // if using energySumArray flush buffer
-       atomicAdd( &(energySumArray[ (int)(ADC/TIMEDECIMATION) ]), 1.0); // diagnostic for energy time distributions
-     
+//       atomicAdd( &(energySumArray[ (int)(ADC/TIMEDECIMATION) ]), 1.0); // diagnostic for energy time distributions
+   
        // generate the x, y coordinates of positron hit on calorimeter
 
        // very simple random (x, y) coordinates
@@ -253,10 +252,8 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
        xcoordstore[nhit] = xcoord;
        ycoordstore[nhit] = ycoord;
        iold[nhit] = nhit;
-       nhit++; // hit counter
- 
-       /*** make hit arrays of xtal-summed calo hits (not individual xtal hits) for diagnostics ***/
 
+       nhit++; // hit counter
      }
 
      // we've now got the arrays of time (tick, itick), lab energy / ADC value (Elab / ADC), x/y coordinates (xcoord / ycoord) of positron with empirical acceptance, (x,y) distributions
@@ -277,24 +274,7 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
        }
      }
 
-     /* SWITCHED OFF
-        simple study of pileup effects 
-
-        doesn't handle the segmentation and effect of amplitude of prior pulse
-        short-term gain-change -> time constant 30ns, amplitude 4%/1000 
-        long-term gain-change -> time constant 10us, amplitude 0.012/(1000*(1-exp(-10./64.)) ~ 10^-4 
-        see SIPM paper https://arxiv.org/pdf/1611.03180.pdf
-     
-        float tauG = 10000.0/nsPerTick, ampG = 0.001;
-          for (int j = 1; j < nhit; j++){
-            for (int k = 0; k < j; k++){
-     	    float dt = tickstore[j] - tickstore[k];
-	    ADCstore[iold[j]] *= 1.0 - ampG*exp(-dt/tauG); 
-          }
-         }
-     */
-
-     /*** parameters for empirical Gaussian distribution of energy across neighboring segments. ***/
+     // parameters for empirical Gaussian distribution of energy across neighboring segments. 
 
      // https://muon.npl.washington.edu/elog/g2/SLAC+Test+Beam+2016/260 and position where energy in 
      // neighboring xtal is 16% (1 sigma) - giving sigma = 0.19 in units of crystal size 
@@ -302,7 +282,7 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
      //float xsig = 0.5, ysig = 0.5; // test with very large spread
      float xsig = 0.19, ysig = 0.19; // stanard  distribtion, xtal size units
      
-     /*** parameters for distributing the ADC counts over time bins of q-method histogram ***/
+     // parameters for distributing the ADC counts over time bins of q-method histogram 
 
      // approx sigma width of 2.1ns from https://muon.npl.washington.edu/elog/g2/SLAC+Test+Beam+2016/38
      //float width = 0.021/nsPerTick; // test - make pulse width x10 smaller
@@ -310,12 +290,13 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
      //float width = 21.0/nsPerTick; // test  - make pulse width x10 larger
      float width = 2.1/nsPerTick; // pulse sigma in q-method bin width units
 
-     /*** parameters for pile-up effects ***/
+     // parameters for pile-up effects 
 
      // simple time constant, pulse amplitude and normalization parameter of pileup effect of prior pulses
      float tauG = 30.0/nsPerTick, ampG = 0.04, ADCnorm = 812;
 
      float ADCstoresegment[54][NEMAX]; // array used for xtal-by-xtal pileup effects 
+     
      for (int i = 0; i < nhit; i++){      // loop over time-ordered positron hits
       
        tick = tickstore[i]; // time array is already time-ordered
@@ -324,16 +305,15 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
        ycoord = ycoordstore[iold[i]];
        //printf("x, y %f, %f, ADC %f, tick %f\n", xcoord, ycoord, ADC, tick); // debugging
 
-       /* 
-	  add effects of injection flash via time-dependent gain sag 
-	  with amplitude of ampFlashGainSag and time constant tauFlashGainSag
-          to all calo pulses - see https://gm2-docdb.fnal.gov/cgi-bin/private/RetrieveFile?docid=10818
-          amplitude of 0.10 is trypical exptrapolation to time t=0 of hot calo gain sag from beam flash
-       */
+	//  add effects of injection flash via time-dependent gain sag 
+	//  with amplitude of ampFlashGainSag and time constant tauFlashGainSag
+        //  to all calo pulses - see https://gm2-docdb.fnal.gov/cgi-bin/private/RetrieveFile?docid=10818
+       //   amplitude of 0.10 is trypical exptrapolation to time t=0 of hot calo gain sag from beam flash
+
        float ampFlashGainSag = 0.10, tauFlashGainSag = 1.0e5/nsPerTick;
        if (flashgainsag) ADC = ADC * (1.0 - ampFlashGainSag * exp( -tick / tauFlashGainSag) ); 
  
-       /*** need Qmethod bin and time within bin for distributing signal over bins ***/
+       // need Qmethod bin and time within bin for distributing signal over bins
        // itick is bin of q-method time histogram
        // rtick is time within bin of q-method time histogram
        int itick = (int) tick;
@@ -352,16 +332,6 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
            fsegmentsum += fsegment;
 	   if (ADCsegment < 1.0) continue; // avoid pileup calc if signal in xtal is neglibible
            
-	   /*  SWITCHED OFF
-
-           // xtal-by-xtal pileup correction
-	   ADCstoresegment[ix+iy*nxseg][i] = ADCsegment; // store samples of "fired" segment
-	   for (int ipu = 0; ipu < i; ipu++) { // handle pileup correction on segment-by-segment basis by looping over prior hits
-	     float dt = tickstore[i] - tickstore[ipu];
-	     ADCsegment *= 1.0 - (ADCstoresegment[ix+iy*nxseg][i]/ADCnorm)*ampG*exp(-dt/tauG);
-	   }
-	   */
-
 	   // array offset needed for storing xtal hits in samples array
 	   int xysegmentoffset = (ix+iy*nxseg)*fill_buffer_max_length; 
 	   
@@ -374,7 +344,7 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
              float ADCfrac = ADCsegment*tfrac; 
 	     tfracsum += tfrac;
 
-             /* FIXME overflow below is incorrect when applied on time decimated bins */
+             // FIXME overflow below is incorrect when applied on time decimated bins 
 	     //if ( ADCfrac > 2048. ) ADCfrac = 2048.; // apply overflow of ADC counts
 
 
@@ -388,35 +358,11 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
            // for no time smearing all xtal ADC counts in single time bin
 	   //atomicAdd( &(fillSumArray[ xysegmentoffset + itick ]), (float)ADCsegment );
 
-           /*** SWITCHED OFF 
-
-           // simple-minded testing of effects of tail of SiPM pulse
-           // e.g. the problem with long tails on SiPM pulses from AC coupling
-
-	   int maxtaillength = 2000; // max tail length calculation  in q-method hostigrma bins
-           float tailamp = -1.0e-3, tailtail = 1000.; // pulse tail parameters
-
-	   for (int k = 0; k <= maxtaillength; k++) {
-	     int kk = k + itick;
-
-	     if ( kk < 0 || kk >= fill_buffer_max_length ) continue;
-
-	     // energy in bin (assume a Gaussian distribution about tick
-	     float tfrac = tailamp*exp(-float(k)/tailtau); // exponential tail
-             float ADCfrac = ADCsegment*tfrac; // need to add some noise
-	     tfracsum += tfrac;
-
-	     if ( ADCfrac > 2048 ) ADCfrac = 2048;
-
-
-	   } // end of SiPM tails
-           ***/
-
 	 } // end of y-distribution loop
        } // end of x-distribution loop
 
      } // end of time-ordered hits hits
-     
+    
      // state index for random number generator
      state[idx] =  localState;
      
@@ -581,7 +527,7 @@ namespace  QSimulation
     ne = t_ne;
     nbatches = t_nbatches;
 
-    fill_buffer_max_length = nsPerFill / nsPerTick;
+    fill_buffer_max_length = nsPerFill / qBinSize;
 
     threshold = t_threshold;
     window = t_window;
@@ -596,7 +542,8 @@ namespace  QSimulation
     ArraySizes["batchSumArrayR"] = nsegs*fill_buffer_max_length*sizeof(float); 
     ArraySizes["batchSumArrayRErr"] = nsegs*fill_buffer_max_length*sizeof(float); 
     ArraySizes["batchSumArrayRErr"] = nsegs*fill_buffer_max_length*sizeof(float); 
-    ArraySizes["d_PUhitSumArray"] = fill_buffer_max_length*sizeof(float); 
+    ArraySizes["hitSumArray"] = fill_buffer_max_length*sizeof(float); 
+    ArraySizes["PUhitSumArray"] = fill_buffer_max_length*sizeof(float); 
 
     // get some cuda device properties
     cudaDeviceProp prop;

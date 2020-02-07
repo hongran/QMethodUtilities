@@ -9,7 +9,7 @@
 
 #include "QMethodStructs.hh"
 
-void QHistBuilder(std::string InputFile,std::string InputDataPath,std::string OutputFile,std::string OutputDataPath)
+void QHistBuilder(int RebinFactor,std::string InputFile,std::string InputDataPath,std::string OutputFile,std::string OutputDataPath)
 {
   double clk = 1.25e-3;//us
   double TFlashVeto = 35.0;//us
@@ -80,6 +80,13 @@ void QHistBuilder(std::string InputFile,std::string InputDataPath,std::string Ou
 	CaloHistSmooth[i]->SetBinError(k,sqrt(Err2));
       }
     }
+  }
+
+  //Rebin
+  for (int i=0;i<24;i++)
+  {
+    CaloHist[i]->Rebin(RebinFactor);
+    CaloHistSmooth[i]->Rebin(RebinFactor);
   }
 
   //Sum over calos
