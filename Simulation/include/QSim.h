@@ -44,7 +44,7 @@ const int nsegs = nxseg*nyseg;
 namespace QSimulation{
   class QSim{
     public:
-      QSim(int t_nThreadsPerBlock,int t_nFillsPerFlushPerFlush,int t_NElectronsPerFill,int t_nFillsPerBatch,float t_threshold,int t_window,bool t_fillnoise,bool t_flashgainsag);
+      QSim(int t_nThreadsPerBlock,int t_nFillsPerFlush,int t_NElectronsPerFill,int t_nFillsPerBatch,float t_threshold,int t_window,bool t_fillnoise,bool t_flashgainsag);
       ~QSim();
       int Simulate(int NFlushes);
       int GetArray(std::string ArrayName,std::vector<double>& Output);

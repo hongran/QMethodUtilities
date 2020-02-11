@@ -263,7 +263,7 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
      // sort array of positron hits into ascending time-order
      int itemp;
      float ftemp;
-     thrust::sort(thrust::device, tickstore, tickstore+nhit);
+     thrust::sort(thrust::seq, tickstore, tickstore+nhit);
      /*
      for (int i = 0; i < nhit; ++i) {
        for (int j = i + 1; j < nhit; ++j) {
