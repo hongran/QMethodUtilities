@@ -71,8 +71,8 @@ fills array fillSumArray[] of size fillls per batch * xtals * time bins with ADC
 also fills hitSumArray (fake Tmethod), energySumArray (diagnostics)
 of size xtals * time bins (they contain all hits, energy, etc in batch)
 */
-__global__ void make_randfill( curandState *state, float *hitSumArray, float *fillSumArray,float *fillSumArrayPed,  float *energySumArray, int ne, int fill_buffer_max_length, int nbatches, int nfills, float threshold, bool fillnoise, bool flashgainsag) {
-  // single thread make complete fill with ne electrons
+__global__ void make_randfill( curandState *state, float *hitSumArray, float *fillSumArray,float *fillSumArrayPed,  float *energySumArray, int NElectronsPerFill, int fill_buffer_max_length, int nbatches, int nFillsPerFlush, float threshold, bool fillnoise, bool flashgainsag) {
+  // single thread make complete fill with NElectronsPerFill electrons
 
    const float tau = 6.4e4;                              // muon time-dilated lifetime (ns)
    const float omega_a = 1.438000e-3;                    // muon anomalous precession frequency (rad/ns)
@@ -113,10 +113,10 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
    int idx = blockIdx.x*256 + threadIdx.x;
 
    // one thread per fill - max threads is "fills in flush" * "flushes in batch"
-   if (idx < nbatches * nfills) {
+   if (idx < nbatches * nFillsPerFlush) {
 
-     int ibatch = idx / nfills; // fills are launched in blocks of nbatches * nfills, ibatch is flush index within flush batch
-     int ifill = idx % nfills;  // fills are launched in nlocks of nbatches * nfills, ifill is fill index within individual flush
+     int ibatch = idx / nFillsPerFlush; // fills are launched in blocks of nbatches * nFillsPerFlush, ibatch is flush index within flush batch
+     int ifill = idx % nFillsPerFlush;  // fills are launched in nlocks of nbatches * nFillsPerFlush, ifill is fill index within individual flush
 
      // state index for random number generator
      curandState localState = state[idx];
@@ -172,7 +172,7 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
      int iold[NEMAX]; // array for storing hit time-ordering 
 
      // find hit times, energies, x,y-coordinates for ne generated electrons from muon decay
-     while (nhit < ne){ // should randomize the hits per fill
+     while (nhit < NElectronsPerFill){ // should randomize the hits per fill
 
        // get muon decay time, tick, from time-dilted exponential decay
        
@@ -367,13 +367,13 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
      state[idx] =  localState;
      
      //atomicAdd( &(fillSumArray[ ibatch*nsegs*fill_buffer_max_length + 100 ]), 999. ); // debuging
-   } // end of if idx < nfills
+   } // end of if idx < nFillsPerFlush
 }
 
 /*
 GPU kernel function - builds fillSumArray from fillArray if fillArray is used and introduces noise at flush-level
 */
-__global__ void make_flushbatchsum( curandState *state, float *fillSumArray, float *fillSumArrayPed, float *batchSumArray, float *batchSumArrayR,float *batchSumArrayErr, float *batchSumArrayRErr, float *PUhitSumArray, int nbatches, int nfills, float threshold, int window, int fill_buffer_max_length) {
+__global__ void make_flushbatchsum( curandState *state, float *fillSumArray, float *fillSumArrayPed, float *batchSumArray, float *batchSumArrayR,float *batchSumArrayErr, float *batchSumArrayRErr, float *PUhitSumArray, int nbatches, int nFillsPerFlush, float threshold, int window, int fill_buffer_max_length) {
 
   // thread index
   int idx = blockIdx.x*256 + threadIdx.x;
@@ -518,13 +518,13 @@ __global__ void make_flushbatchsum( curandState *state, float *fillSumArray, flo
 
 namespace  QSimulation
 {
-  QSim::QSim(int t_nthreads,int t_nfills,int t_ne,int t_nbatches,float t_threshold,int t_window,bool t_fillnoise,bool t_flashgainsag)
+  QSim::QSim(int t_nThreadsPerBlock,int t_nFillsPerFlush,int t_NElectronsPerFill,int t_nbatches,float t_threshold,int t_window,bool t_fillnoise,bool t_flashgainsag)
   {
     cudaError err;
 
-    nthreads = t_nthreads;
-    nfills = t_nfills;
-    ne = t_ne;
+    nThreadsPerBlock = t_nThreadsPerBlock;
+    nFillsPerFlush = t_nFillsPerFlush;
+    NElectronsPerFill = t_NElectronsPerFill;
     nbatches = t_nbatches;
 
     fill_buffer_max_length = nsPerFill / qBinSize;
@@ -554,7 +554,7 @@ namespace  QSimulation
     printf("Memory Bus Width (bits): %d\n", prop.memoryBusWidth);
     printf("\n\n");
 
-    cudaMalloc( (void **)&d_state, nsegs*nbatches*nfills*sizeof(curandState));
+    cudaMalloc( (void **)&d_state, nsegs*nbatches*nFillsPerFlush*sizeof(curandState));
 
     for (auto it=ArraySizes.begin();it!=ArraySizes.end();++it)
     {
@@ -570,8 +570,8 @@ namespace  QSimulation
       exit(0);
     }
 
-    int nblocks = nbatches * nfills / nthreads + 1;
-    init_rand<<<nblocks,nthreads>>>( d_state, 0, time(NULL));
+    int nblocks = nbatches * nFillsPerFlush / nThreadsPerBlock + 1;
+    init_rand<<<nblocks,nThreadsPerBlock>>>( d_state, 0, time(NULL));
 
   }
 
@@ -602,10 +602,10 @@ namespace  QSimulation
       }
       //Simulate
       // make the fills
-      int nblocks = nbatches * nfills / nthreads + 1;
+      int nblocks = nbatches * nFillsPerFlush / nThreadsPerBlock + 1;
 
       std::cout << nblocks<<std::endl;
-      make_randfill<<<nblocks,nthreads>>>( d_state, DeviceArrays["hitSumArray"], DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["energySumArray"], ne, fill_buffer_max_length, nbatches, nfills, threshold, fillnoise, flashgainsag);
+      make_randfill<<<nblocks,nThreadsPerBlock>>>( d_state, DeviceArrays["hitSumArray"], DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["energySumArray"], ne, fill_buffer_max_length, nbatches, nFillsPerFlush, threshold, fillnoise, flashgainsag);
       cudaThreadSynchronize();
       err=cudaGetLastError();
       if(err!=cudaSuccess) {
@@ -613,8 +613,8 @@ namespace  QSimulation
 	exit(0);
       }
 
-      nblocks = ( nsegs * fill_buffer_max_length + nthreads - 1 )/ nthreads;
-      make_flushbatchsum<<<nblocks,nthreads>>>( d_state, DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["batchSumArray"], DeviceArrays["batchSumArrayR"], DeviceArrays["batchSumArrayErr"], DeviceArrays["batchSumArrayRErr"], DeviceArrays["PUhitSumArray"], nbatches, nfills, threshold, window, fill_buffer_max_length);
+      nblocks = ( nsegs * fill_buffer_max_length + nThreadsPerBlock - 1 )/ nThreadsPerBlock;
+      make_flushbatchsum<<<nblocks,nThreadsPerBlock>>>( d_state, DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["batchSumArray"], DeviceArrays["batchSumArrayR"], DeviceArrays["batchSumArrayErr"], DeviceArrays["batchSumArrayRErr"], DeviceArrays["PUhitSumArray"], nbatches, nFillsPerFlush, threshold, window, fill_buffer_max_length);
       cudaThreadSynchronize();
       err=cudaGetLastError();
       if(err!=cudaSuccess) {
