@@ -51,8 +51,8 @@ namespace QSimulation{
     private:
       // define nThreadsPerBlock per block for GPU
       int nThreadsPerBlock; //number of threads per block
-      int nFillsPerFlushPerFlush; //number of fills per flush
-      int NElectronsPerFill; // number of electrons per fill
+      int nFillsPerFlush; //number of fills per flush
+      int nElectronsPerFill; // number of electrons per fill
       int nFillsPerBatch; //number of fills for each GPU computing cycle (batch)
 
       int fill_buffer_max_length; // fill length in unit of hostogram bins
