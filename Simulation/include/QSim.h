@@ -48,6 +48,7 @@ namespace QSimulation{
       ~QSim();
       int Simulate(int NFlushes);
       int GetArray(std::string ArrayName,std::vector<double>& Output);
+      int GetCaloArray(std::string ArrayName,std::vector<double>& Output);
     private:
       // define nThreadsPerBlock per block for GPU
       int nThreadsPerBlock; //number of threads per block

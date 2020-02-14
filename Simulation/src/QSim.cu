@@ -546,7 +546,6 @@ namespace  QSimulation
     ArraySizes["batchSumArrayErr"] = nsegs*fill_buffer_max_length*sizeof(float); 
     ArraySizes["batchSumArrayR"] = nsegs*fill_buffer_max_length*sizeof(float); 
     ArraySizes["batchSumArrayRErr"] = nsegs*fill_buffer_max_length*sizeof(float); 
-    ArraySizes["batchSumArrayRErr"] = nsegs*fill_buffer_max_length*sizeof(float); 
     ArraySizes["hitSumArray"] = fill_buffer_max_length*sizeof(float); 
     ArraySizes["PUhitSumArray"] = fill_buffer_max_length*sizeof(float); 
 
@@ -596,15 +595,17 @@ namespace  QSimulation
   {
     cudaError err;
     int NSim = NFlushes/nFillsPerBatch + 1;
+    //Clean device memory
+    for (auto it=ArraySizes.begin();it!=ArraySizes.end();++it)
+    {
+      auto Name = it->first;
+      auto Size = it->second;
+      cudaMemset( DeviceArrays[Name], 0.0, Size);
+    }
+
     for (int i=0;i<NSim;i++)
     {
-      //Clean device memory
-      for (auto it=ArraySizes.begin();it!=ArraySizes.end();++it)
-      {
-	auto Name = it->first;
-	auto Size = it->second;
-	cudaMemset( DeviceArrays[Name], 0.0, Size);
-      }
+      
       //Simulate
       // make the fills
       int nblocks = nFillsPerBatch * nFillsPerFlush / nThreadsPerBlock + 1;
@@ -614,8 +615,8 @@ namespace  QSimulation
       cudaDeviceSynchronize();
       err=cudaGetLastError();
       if(err!=cudaSuccess) {
-	printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
-	exit(0);
+	      printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
+	      exit(0);
       }
 
       nblocks = ( nsegs * fill_buffer_max_length + nThreadsPerBlock - 1 )/ nThreadsPerBlock;
@@ -623,26 +624,27 @@ namespace  QSimulation
       cudaDeviceSynchronize();
       err=cudaGetLastError();
       if(err!=cudaSuccess) {
-	printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
-	exit(0);
-      }
-
-      //Copy back to host memory
-      int n=0;
-      for (auto it=ArraySizes.begin();it!=ArraySizes.end();++it)
-      {
-	auto Name = it->first;
-	auto Size = it->second;
-	cudaMemcpy( HostArrays[Name], DeviceArrays[Name], Size, cudaMemcpyDeviceToHost);
-        std::cout<< n << " "<<Size<<std::endl;
-	err=cudaGetLastError();
-	if(err!=cudaSuccess) {
-	  printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
-	  exit(0);
-	}
-	n++;
+	      printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
+	      exit(0);
       }
     }
+
+    //Copy back to host memory
+    int n=0;
+    for (auto it=ArraySizes.begin();it!=ArraySizes.end();++it)
+    {
+      auto Name = it->first;
+      auto Size = it->second;
+      cudaMemcpy( HostArrays[Name], DeviceArrays[Name], Size, cudaMemcpyDeviceToHost);
+      std::cout<< n << " "<<Size<<std::endl;
+      err=cudaGetLastError();
+      if(err!=cudaSuccess) {
+        printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
+        exit(0);
+      }
+      n++;
+    }
+
     return 0;
   }
 
@@ -655,6 +657,26 @@ namespace  QSimulation
     {
       Output[i] = ptr[i];
     }
+    return 0;
+  }
+
+  int QSim::GetCaloArray(std::string ArrayName,std::vector<double>& Output)
+  {
+    Output.clear();
+    Output.resize(fill_buffer_max_length,0.0);
+    auto ptr = HostArrays[ArrayName];
+
+    for (unsigned int k=0;k<nFillsPerBatch;k++)
+    {
+      for (unsigned int j=0;j<nsegs;j++)
+      {
+        for (unsigned int i=0;i<fill_buffer_max_length;i++)
+        {
+          Output[i] += ptr[(k*nsegs+j)*fill_buffer_max_length + i];
+        }
+      }
+    }
+    
     return 0;
   }
 
