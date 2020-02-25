@@ -10,9 +10,53 @@
 #include "TF1.h"
 #include "TVirtualFFT.h"
 
+
+//Function classes
+class  FitFunction10Par {
+  private:
+    double fAcbo;
+    double fBcbo;
+    double fTauAcbo;
+    double fTauBcbo;
+    double ft0;
+ public:
+    FitFunction10Par(){}
+    FitFunction10Par(double t0,double Acbo,double Bcbo, double TauAcbo, double TauBcbo):ft0(t0),fAcbo(Acbo),fBcbo(Bcbo),fTauAcbo(TauAcbo),fTauBcbo(TauBcbo)
+    {}
+   
+    double operator() (double *x, double *par) {
+      double t = x[0];
+
+      //Basic function
+      /*
+      par[0]: Normalization
+      par[1]: phase shift
+      par[2]: asymmetry 
+      par[3]: lifetiem
+      par[4]: normalization
+      par[5]: constant background
+      */
+      double f = par[4]*exp(-(t-ft0)/par[3])*(1+par[2]*cos(par[0]*(t-ft0)+par[1]))+par[5];
+
+      //par[6]: a_cbo;
+      //par[7]: tau_cbo;
+      //par[8]: frequency constant for cbo frequency
+      //par[9]: phi_cbo
+      double omega_cbo =  par[8] * ( 1.0 + fAcbo*exp( -( t-ft0 ) / fTauAcbo ) / ( par[8] * (t - ft0) ) + fBcbo*exp( -( t - ft0 ) / fTauBcbo ) / ( par[8] * (t - ft0) ) );
+
+      double n_cbo = 1.0 - par[6]* exp( -( t - ft0 ) / par[7] ) * cos( omega_cbo * ( t - ft0 )   +  par[9] ) ;
+
+      f *= n_cbo;
+      return f;
+
+   }
+};
+
+Double_t fprec(Double_t *x, Double_t *par);
+
 class QFit{
   public:
-    QFit();
+    QFit(std::string DataSetName);
     ~QFit();
     //Access Functions
     TF1 GetFunction(std::string fName);
@@ -21,7 +65,11 @@ class QFit{
     TH1* GetResidualFFT();
     TF1 Fit(TH1 *hist,double FitStart,double FitEnd,std::string fName=std::string("f5ParFit"));
   private:
+    //data set name
+    std::string fDataSet;
     //Fit Functions
+    FitFunction10Par f10Par;
+
     std::map<std::string,TF1> fFunctionMap_;
     std::string fFitName_;
     //Residual
@@ -29,12 +77,41 @@ class QFit{
     TH1* hResFFT_;
 };
 
-QFit::QFit()
+QFit::QFit(std::string DataSetName):fDataSet(DataSetName)
 {
+  double t0 = 0;
+  //Initializing the constants for dataset
+  double Acbo = 0.0;
+  double Bcbo = 0.0;
+  double TauAcbo = 0.0;
+  double TauBcbo = 0.0;
+  if (DataSetName.compare("60hr")==0)
+  {
+    TauAcbo = 81.8;
+    TauBcbo = 7.7;
+    Acbo = 0.0;
+    Bcbo = 0.0;
+  }else if (DataSetName.compare("9day")==0)
+  {
+    TauAcbo = 81.8;
+    TauBcbo = 7.7;
+    Acbo = 0.0;
+    Bcbo = 0.0;
+  }
+
+  //function objects
+  f10Par = FitFunction10Par(t0,Acbo,Bcbo,TauAcbo,TauBcbo);
+
+  //Default fit
   fFitName_ = "f5ParFit";
+  //Function List
   fFunctionMap_["f5ParFit"] = TF1("f5ParFit","[4]*exp(-x/[3])*(1+[2]*cos([0]*x+[1]))",0,300);
   fFunctionMap_["f5ParFit"].SetNpx(2000);
   fFunctionMap_["f5ParFit"].SetParameters(1.4,0,0.3,60,9e7);
+
+  fFunctionMap_["f10ParFit"] = TF1("f10ParFit",f10Par,0,300,10);
+  fFunctionMap_["f10ParFit"].SetNpx(2000);
+  fFunctionMap_["f10ParFit"].SetParameters(1.4,0,0.3,60,9e7,0.0,0.0,0.0,2.33,0.0);
 }
 
 QFit::~QFit()

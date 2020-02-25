@@ -9,6 +9,7 @@ OutputPath = os.getenv("QHISTOGRAMDIR")
 InputFileName = "MergedData9d_1213.root"
 OutputFileName = "QHists9d.root"
 RebinFactor  = 2
+DataSetName = "9day"
 
 #RecompileModules = True
 RecompileModules = False
@@ -63,9 +64,9 @@ QHistSmoothTotal.Draw()
 c3.Update()
 
 print("Start Fitting...")
-QFitter = QFit()
+QFitter = QFit(DataSetName)
 
-fFit = QFitter.Fit(QHistSmoothTotal,61,260,"f5ParFit")
+fFit = QFitter.Fit(QHistSmoothTotal,61,260,"f10ParFit")
 
 fFit.Draw("same")
 
