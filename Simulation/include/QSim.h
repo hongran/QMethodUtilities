@@ -44,15 +44,16 @@ const int nsegs = nxseg*nyseg;
 namespace QSimulation{
   class QSim{
     public:
-      QSim(int t_nThreadsPerBlock,int t_nFillsPerFlushPerFlush,int t_NElectronsPerFill,int t_nFillsPerBatch,float t_threshold,int t_window,bool t_fillnoise,bool t_flashgainsag);
+      QSim(int t_nThreadsPerBlock,int t_nFillsPerFlush,int t_NElectronsPerFill,int t_nFillsPerBatch,float t_threshold,int t_window,bool t_fillnoise,bool t_flashgainsag);
       ~QSim();
       int Simulate(int NFlushes);
       int GetArray(std::string ArrayName,std::vector<double>& Output);
+      int GetCaloArray(std::string ArrayName,std::vector<double>& Output);
     private:
       // define nThreadsPerBlock per block for GPU
       int nThreadsPerBlock; //number of threads per block
-      int nFillsPerFlushPerFlush; //number of fills per flush
-      int NElectronsPerFill; // number of electrons per fill
+      int nFillsPerFlush; //number of fills per flush
+      int nElectronsPerFill; // number of electrons per fill
       int nFillsPerBatch; //number of fills for each GPU computing cycle (batch)
 
       int fill_buffer_max_length; // fill length in unit of hostogram bins
