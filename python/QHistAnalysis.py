@@ -1,7 +1,7 @@
 import os
 import ROOT
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 ROOTModulePath = os.getenv("QROOTDIR")
 InputDataPath = os.getenv("QINPUTDATADIR")
@@ -11,13 +11,13 @@ OutputFileName = "QHists9d.root"
 RebinFactor  = 2
 DataSetName = "9day"
 
-#RecompileModules = True
-RecompileModules = False
+RecompileModules = True
+#RecompileModules = False
 
 #Build the histograms
 if RecompileModules:
-  HistBuilderModule = ROOTModulePath + "/" + "QHistBuilder.C+"
-  QFitModule = ROOTModulePath + "/" + "QFit.C+"
+  HistBuilderModule = ROOTModulePath + "/" + "QHistBuilder.C++"
+  QFitModule = ROOTModulePath + "/" + "QFit.C++"
 else:
   HistBuilderModule = ROOTModulePath + "/" + "QHistBuilder_C.so"
   QFitModule = ROOTModulePath + "/" + "QFit_C.so"

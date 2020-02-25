@@ -42,7 +42,7 @@ class  FitFunction10Par {
       //par[7]: tau_cbo;
       //par[8]: frequency constant for cbo frequency
       //par[9]: phi_cbo
-      double omega_cbo =  par[8] * ( 1.0 + fAcbo*exp( -( t-ft0 ) / fTauAcbo ) / ( par[8] * (t - ft0) ) + fBcbo*exp( -( t - ft0 ) / fTauBcbo ) / ( par[8] * (t - ft0) ) );
+      double omega_cbo =  par[8]*(1.0 + fAcbo*exp(-(t-ft0)/fTauAcbo)/(par[8]*(t - ft0)) + fBcbo*exp(-(t-ft0)/fTauBcbo)/ (par[8]*(t-ft0)));
 
       double n_cbo = 1.0 - par[6]* exp( -( t - ft0 ) / par[7] ) * cos( omega_cbo * ( t - ft0 )   +  par[9] ) ;
 
@@ -87,16 +87,16 @@ QFit::QFit(std::string DataSetName):fDataSet(DataSetName)
   double TauBcbo = 0.0;
   if (DataSetName.compare("60hr")==0)
   {
-    TauAcbo = 81.8;
-    TauBcbo = 7.7;
-    Acbo = 0.0;
-    Bcbo = 0.0;
+    Acbo = 2.79;
+    Bcbo = 5.63;
+    TauAcbo = 61.1;
+    TauBcbo = 6.07;
   }else if (DataSetName.compare("9day")==0)
   {
-    TauAcbo = 81.8;
-    TauBcbo = 7.7;
-    Acbo = 0.0;
-    Bcbo = 0.0;
+    Acbo = 2.8;
+    Bcbo = 6.18;
+    TauAcbo = 56.6;
+    TauBcbo = 6.32;
   }
 
   //function objects
@@ -105,13 +105,14 @@ QFit::QFit(std::string DataSetName):fDataSet(DataSetName)
   //Default fit
   fFitName_ = "f5ParFit";
   //Function List
-  fFunctionMap_["f5ParFit"] = TF1("f5ParFit","[4]*exp(-x/[3])*(1+[2]*cos([0]*x+[1]))",0,300);
+  fFunctionMap_["f5ParFit"] = TF1("f5ParFit","[4]*exp(-x/[3])*(1+[2]*cos([0]*x+[1]))",30,300);
   fFunctionMap_["f5ParFit"].SetNpx(2000);
-  fFunctionMap_["f5ParFit"].SetParameters(1.4,0,0.3,60,9e7);
+  fFunctionMap_["f5ParFit"].SetParameters(1.44,-4.7,0.232,64.33,2.45e8);
 
-  fFunctionMap_["f10ParFit"] = TF1("f10ParFit",f10Par,0,300,10);
+  fFunctionMap_["f10ParFit"] = TF1("f10ParFit",f10Par,30,300,10);
   fFunctionMap_["f10ParFit"].SetNpx(2000);
-  fFunctionMap_["f10ParFit"].SetParameters(1.4,0,0.3,60,9e7,0.0,0.0,0.0,2.33,0.0);
+  fFunctionMap_["f10ParFit"].SetParameters(1.44,-4.7,0.232,64.33,2.45e8,0.0,0.29,143.3,2.33,0.0);
+  fFunctionMap_["f10ParFit"].FixParameter(5,0.0);
 }
 
 QFit::~QFit()
