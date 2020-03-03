@@ -73,18 +73,18 @@ fills array fillSumArray[] of size fillls per batch * xtals * time bins with ADC
 also fills hitSumArray (fake Tmethod), energySumArray (diagnostics)
 of size xtals * time bins (they contain all hits, energy, etc in batch)
 */
-__global__ void make_randfill( curandState *state, float *hitSumArray, float *fillSumArray,float *fillSumArrayPed,  float *energySumArray, int NElectronsPerFill, int fill_buffer_max_length, int nFillsPerBatch, int nFillsPerFlush, float threshold, bool fillnoise, bool flashgainsag) {
+__global__ void make_randfill( curandState *state, float *pulseTemplate, float *hitSumArray, float *fillSumArray,float *fillSumArrayPed,  float *energySumArray, int TemplateSize, int TemplateZero, int NElectronsPerFill, int fill_buffer_max_length, int nFillsPerBatch, int nFillsPerFlush, float threshold, bool fillnoise, bool flashgainsag) {
   // single thread make complete fill with NElectronsPerFill electrons
 
    const float tau = 6.4e4;                              // muon time-dilated lifetime (ns)
    const float omega_a = 1.438000e-3;                    // muon anomalous precession frequency (rad/ns)
    const float magicgamma = 29.3;                        // gamma factor for magic momentum 3.094 GeV/c
    const float SimToExpCalCnst = 0.057;                  // energy-ADC counts conversion (ADC counts / energy GeV)
-   const int nsPerTick = TIMEDECIMATION*1000/800;        // Q-method histogram bin size (ns), accounts for 800MHz sampling rate
+   const float qBinSize = TIMEDECIMATION*1000/800;        // Q-method histogram bin size (ns), accounts for 800MHz sampling rate
    const float Elab_max = 3.095;                         // GeV, maximum positron lab energy
    const float Pi = 3.1415926;                           // Pi
-   const float cyclotronperiod = 149.0/nsPerTick;        // cyclotron period in histogram bin units
-   const float anomalousperiod = 4370./nsPerTick;        // anomalous period omega_c-omega_s in histogram bin units
+   const float cyclotronperiod = 149.0/qBinSize;        // cyclotron period in histogram bin units
+   const float anomalousperiod = 4370./qBinSize;        // anomalous period omega_c-omega_s in histogram bin units
    const int nxseg = NXSEG, nyseg = NYSEG, nsegs = NSEG; // calorimeter segmentation
 
    // parameters for empirical calculation of positron drift time from energy via empirical polynomial
@@ -101,9 +101,9 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
 
    // parameters to mimic first-order pileup in T-method (no spatial resolution of pulse pileup)
    float PUtick, prevtick, prevADC; // mimic T-method pileup
-   float PUdt = 10.0/nsPerTick; // convert from ns to clock ticks
+   float PUdt = 10.0/qBinSize; // convert from ns to clock ticks
    float PUth = 1.8*GeVToADC/PeakBinFrac; // convert from GeV to ADC value
-   PUdt = 0.0/nsPerTick; // switch off PU
+   PUdt = 0.0/qBinSize; // switch off PU
    PUth = 0.0*GeVToADC/PeakBinFrac; // switch off PU
 
    // variables for muon decay / kinematics 
@@ -112,12 +112,12 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
    float r, r_test; // pars for energy dists of mu-decays  
 
    // thread index
-   int idx = blockIdx.x*256 + threadIdx.x;
+   int idx = blockIdx.x*blockDim.x + threadIdx.x;
 
    // one thread per fill - max threads is "fills in flush" * "flushes in batch"
    if (idx < nFillsPerBatch * nFillsPerFlush) {
 
-     int ibatch = idx / nFillsPerFlush; // fills are launched in blocks of nFillsPerBatch * nFillsPerFlush, ibatch is flush index within flush batch
+     int iflush = idx / nFillsPerFlush; // fills are launched in blocks of nFillsPerBatch * nFillsPerFlush, iflush is flush index within flush batch
      int ifill = idx % nFillsPerFlush;  // fills are launched in nlocks of nFillsPerBatch * nFillsPerFlush, ifill is fill index within individual flush
 
      // state index for random number generator
@@ -137,8 +137,8 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
 
        // empirical time-dependent pedestal, gaussian noise
        // for parameter values see ~/Experiments/g-2/Analysis/June2017/tailstats.ods
-       float shrt_tau = 14000./nsPerTick; // shrt pedestal lifetime ns->ticks 
-       float long_tau = 77000./nsPerTick; // long pedestal lifetime ns->ticks
+       float shrt_tau = 14000./qBinSize; // shrt pedestal lifetime ns->ticks 
+       float long_tau = 77000./qBinSize; // long pedestal lifetime ns->ticks
        //float shrt_ampl = 9.1; // amplitude of shrt pedestal lifetime at t=0 in ADC counts per single fill, June 2017
        //float long_ampl = 2.7; // amplitude of long pedestal lifetime at t=0 in ADC counts per single fill, June 2017
        float shrt_ampl = 20.; // amplitude of shrt pedestal lifetime at t=0 in ADC counts per single fill, Jan 2018, 8129
@@ -150,18 +150,18 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
        //float prodtocom = -0.17; // commissioning to production run normalization factor of pedestal variation per fill (note sign)
        //float prodtocom = 0.0; // commissioning to production run normalization factor of pedestal variation per fill
 
-	 for (int i = 0; i < nsegs*fill_buffer_max_length; i++){ // loop over each time bin of each xtal (fill_buffer_max_length is Q-method bins per segment per fill)
-	   int iseg = i / fill_buffer_max_length; // xtal index
-	   int ibin = i % fill_buffer_max_length; // time bin index
-	   /*** add pedestal and statistical noise at flush level ***/
-	   float pedestal = prodtocom * ( shrt_ampl*exp(-float(ibin)/shrt_tau) + long_ampl*exp(-float(ibin)/long_tau) ); // xtal independent 
-	   //float noise = pedestal + sigma * curand_normal(&localState); // pedestal w/ noise
-	   //state[ nFillsPerBatch*nsegs*fill_buffer_max_length + i] = localState; // pedestal w/ noise
-	   float noise = pedestal; // pedestal w/o noise
-	   atomicAdd( &(fillSumArray[ ibatch*nsegs*fill_buffer_max_length + i ]), noise ); // fill with noise for particular fill in batch
-	   atomicAdd( &(fillSumArrayPed[ ibatch*nsegs*fill_buffer_max_length + i ]), noise ); // fill with noise for particular fill in batch
-	 } // end loop over samples * xtals
-     } // end if fill-by-fill noise
+	     for (int i = 0; i < nsegs*fill_buffer_max_length; i++){ // loop over each time bin of each xtal (fill_buffer_max_length is Q-method bins per segment per fill)
+	       int iseg = i / fill_buffer_max_length; // xtal index
+	       int ibin = i % fill_buffer_max_length; // time bin index
+	       /*** add pedestal and statistical noise at flush level ***/
+	       float pedestal = prodtocom * ( shrt_ampl*exp(-float(ibin)/shrt_tau) + long_ampl*exp(-float(ibin)/long_tau) ); // xtal independent 
+	       //float noise = pedestal + sigma * curand_normal(&localState); // pedestal w/ noise
+	       //state[ nFillsPerBatch*nsegs*fill_buffer_max_length + i] = localState; // pedestal w/ noise
+	       float noise = pedestal; // pedestal w/o noise
+	       atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + i ]), noise ); // fill with noise for particular fill in batch
+	       atomicAdd( &(fillSumArrayPed[ iflush*nsegs*fill_buffer_max_length + i ]), noise ); // fill with noise for particular fill in batch
+	     } // end loop over samples * xtals
+      } // end if fill-by-fill noise
 
      int nhit = 0; // hit counter
      float theta = 0; // decay angle
@@ -181,7 +181,7 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
        rt = curand_uniform_double(&localState);  
 
        t = -tau * log( 1.0 - rt );     // random from exp(-t/tau) using uniform random number 0->1
-       tick = t/nsPerTick;                                      // convert from ns to Q-method histogram bin units
+       tick = t/qBinSize;                                      // convert from ns to Q-method histogram bin units
        int itick = (int)tick; // q-method histogram bin from decay time in bin units
        if ( itick  >= fill_buffer_max_length ) continue; // time out-of-bounds 
      
@@ -206,9 +206,9 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
 
        // simple acceptance paramterization from Aaron see Experiments/g-2/Analysis/Qmethod/functionForTim.C
        if (Elab > 0.7*Elab_max) {
-	 r_test = 1.0;
+	       r_test = 1.0;
        } else {
-	 r_test = Elab/(0.7*Elab_max);
+	       r_test = Elab/(0.7*Elab_max);
        }
        r = curand_uniform(&localState);  
        if ( r >= r_test ) continue;
@@ -239,9 +239,9 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
        // rough empirical x-distribution obtained from  https://muon.npl.washington.edu/elog/g2/Simulation/258 (Robin)
        // rough empirical y-distribution obtained from  https://muon.npl.washington.edu/elog/g2/Simulation/256 (Pete)
        if ( ylab > 0.7 ) {
-	 xmax = 185.-533.3*(ylab-0.7);
+	       xmax = 185.-533.3*(ylab-0.7);
        } else {
-	 xmax = 185.;
+	       xmax = 185.;
        }
        xrand = curand_uniform(&localState);
        xcoord = xmax*xrand/25.0; // x-coordinate -> segment/xtal units
@@ -290,15 +290,16 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
      // parameters for distributing the ADC counts over time bins of q-method histogram 
 
      // approx sigma width of 2.1ns from https://muon.npl.washington.edu/elog/g2/SLAC+Test+Beam+2016/38
-     //float width = 0.021/nsPerTick; // test - make pulse width x10 smaller
-     //float width = 0.21/nsPerTick; // test - make pulse width x10 smaller
-     //float width = 21.0/nsPerTick; // test  - make pulse width x10 larger
-     float width = 2.1/nsPerTick; // pulse sigma in q-method bin width units
+     //float width = 0.021/qBinSize; // test - make pulse width x10 smaller
+     //float width = 0.21/qBinSize; // test - make pulse width x10 smaller
+     //float width = 21.0/qBinSize; // test  - make pulse width x10 larger
+     float width = 2.1/qBinSize; // pulse sigma in q-method bin width units
 
      // parameters for pile-up effects 
 
      // simple time constant, pulse amplitude and normalization parameter of pileup effect of prior pulses
-     float tauG = 30.0/nsPerTick, ampG = 0.04, ADCnorm = 812;
+     //OBSOLETE 
+     //float tauG = 30.0/qBinSize, ampG = 0.04, ADCnorm = 812;
 
      float ADCstoresegment[54][NEMAX]; // array used for xtal-by-xtal pileup effects 
      
@@ -315,7 +316,7 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
         //  to all calo pulses - see https://gm2-docdb.fnal.gov/cgi-bin/private/RetrieveFile?docid=10818
        //   amplitude of 0.10 is trypical exptrapolation to time t=0 of hot calo gain sag from beam flash
 
-       float ampFlashGainSag = 0.10, tauFlashGainSag = 1.0e5/nsPerTick;
+       float ampFlashGainSag = 0.10, tauFlashGainSag = 1.0e5/qBinSize;
        if (flashgainsag) ADC = ADC * (1.0 - ampFlashGainSag * exp( -tick / tauFlashGainSag) ); 
  
        // need Qmethod bin and time within bin for distributing signal over bins
@@ -323,55 +324,96 @@ __global__ void make_randfill( curandState *state, float *hitSumArray, float *fi
        // rtick is time within bin of q-method time histogram
        int itick = (int) tick;
        float rtick = tick - itick;
-       
+
+      //Time distribution
+      float TimeBinFractions[5];
+      int TickEdgeIndex = rtick*10 - TemplateZero; 
+      if (TickEdgeIndex > 0)
+      {
+        TimeBinFractions[0] = pulseTemplate[TickEdgeIndex];
+      }else{
+        TimeBinFractions[0] = 0.0;
+      }
+      for (int tempIdx=1;tempIdx<5;tempIdx++)
+      {
+        int leftIdx = TickEdgeIndex + (tempIdx-1)*qBinSize*10;
+        int rightIdx = TickEdgeIndex + tempIdx*qBinSize*10;
+        if (leftIdx<0)
+        {
+          leftIdx = 0;
+        }
+        if (leftIdx >= TemplateSize)
+        {
+          leftIdx = TemplateSize-1;
+        }
+        if (rightIdx >= TemplateSize)
+        {
+          rightIdx = TemplateSize-1;
+        }
+        TimeBinFractions[tempIdx] = pulseTemplate[rightIdx] - pulseTemplate[leftIdx];
+      }
+
        // we're now going to distribute the ADC signal accross x,y segments and time bins filling the array fillSumArray of size time bins * xsegs * ysegs
 
        // loop over the array of xtals and distribute the total ADC counts (ADC) to each xtal (ADC segment) using the hit coordinates xcoord, ycoords and spreads xsig, ysig. 
        float fsegmentsum = 0.0; // diagnostic parameter for distribution of energy over segments
        for (int ix = 0; ix < nxseg; ix++) {
-	 for (int iy = 0; iy < nyseg; iy++) { 	   // calc energy in segment (assume aGaussian distribution about xc, yc)
+	       for (int iy = 0; iy < nyseg; iy++) { 	   // calc energy in segment (assume aGaussian distribution about xc, yc)
            float fsegmentx = 0.5*(-erfcf((ix+1.0-xcoord)/(sqrt(2.)*xsig))+erfcf((ix-xcoord)/(sqrt(2.)*xsig)));
-	   float fsegmenty = 0.5*(-erfcf((iy+1.0-ycoord)/(sqrt(2.)*ysig))+erfcf((iy-ycoord)/(sqrt(2.)*ysig)));
+	         float fsegmenty = 0.5*(-erfcf((iy+1.0-ycoord)/(sqrt(2.)*ysig))+erfcf((iy-ycoord)/(sqrt(2.)*ysig)));
            float fsegment = fsegmentx*fsegmenty;
-	   float ADCsegment = fsegment*ADC;
+	         float ADCsegment = fsegment*ADC;
            fsegmentsum += fsegment;
-	   if (ADCsegment < 1.0) continue; // avoid pileup calc if signal in xtal is neglibible
+	         if (ADCsegment < 1.0) continue; // avoid pileup calc if signal in xtal is neglibible
            
-	   // array offset needed for storing xtal hits in samples array
-	   int xysegmentoffset = (ix+iy*nxseg)*fill_buffer_max_length; 
-	   
-	   // do time smearing of positron pulse over several contiguous time bins, just loop over bins k-1, k, k+1 as negligible in other bins   
-	   float tfracsum = 0.0; // diagnostic for distribution of energy over segments
-	   for (int k=-1; k<=1; k++) {
-	     int kk = k + itick;
-	     if ( kk < 0 || kk >= fill_buffer_max_length ) continue;
-	     float tfrac = 0.5*(-erfcf((kk+1.0-tick)/(sqrt(2.)*width))+erfcf((kk-tick)/(sqrt(2.)*width))); // energy in bin (assume a Gaussian distribution about tick (time within central bin)
+	         // array offset needed for storing xtal hits in samples array
+	         int xysegmentoffset = (ix+iy*nxseg)*fill_buffer_max_length; 
+     
+           //Time distribution
+           for (int k=0; k<5; k++) {
+             int kk = k + itick -1;
+             if ( kk < 0 || kk >= fill_buffer_max_length ) continue;
+             float ADCfrac = ADCsegment*TimeBinFractions[k]; 
+
+             if ( ADCfrac >= 1 ) {
+              //printf("xtal %i, ADCfrac %f\n", ix+iy*nxseg, ADCfrac);
+              atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + kk ]), ADCfrac/TIMEDECIMATION); // divide by time decimation to account for data processing calculates the time-decimated average not sum
+             }
+           }
+           //OBSOLETE do time smearing of positron pulse over several contiguous time bins, just loop over bins k-1, k, k+1 as negligible in other bins   
+           /*
+	         float tfracsum = 0.0; // diagnostic for distribution of energy over segments
+	         for (int k=-1; k<=1; k++) {
+	           int kk = k + itick;
+	           if ( kk < 0 || kk >= fill_buffer_max_length ) continue;
+	           float tfrac = 0.5*(-erfcf((kk+1.0-tick)/(sqrt(2.)*width))+erfcf((kk-tick)/(sqrt(2.)*width))); // energy in bin (assume a Gaussian distribution about tick (time within central bin)
              float ADCfrac = ADCsegment*tfrac; 
-	     tfracsum += tfrac;
+	            tfracsum += tfrac;
 
              // FIXME overflow below is incorrect when applied on time decimated bins 
-	     //if ( ADCfrac > 2048. ) ADCfrac = 2048.; // apply overflow of ADC counts
+	           //if ( ADCfrac > 2048. ) ADCfrac = 2048.; // apply overflow of ADC counts
 
 
-	     if ( ADCfrac >= 1 ) {
+	           if ( ADCfrac >= 1 ) {
                //printf("xtal %i, ADCfrac %f\n", ix+iy*nxseg, ADCfrac);
-	       atomicAdd( &(fillSumArray[ ibatch*nsegs*fill_buffer_max_length + xysegmentoffset + kk ]), ADCfrac/TIMEDECIMATION); // divide by time decimation to account for data processing calculates the time-decimated average not sum
-	     }
+	             atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + kk ]), ADCfrac/TIMEDECIMATION); // divide by time decimation to account for data processing calculates the time-decimated average not sum
+	            }
 
-	   } // end of time smearing
+             } // end of time smearing
+            */
 
            // for no time smearing all xtal ADC counts in single time bin
-	   //atomicAdd( &(fillSumArray[ xysegmentoffset + itick ]), (float)ADCsegment );
+	     //atomicAdd( &(fillSumArray[ xysegmentoffset + itick ]), (float)ADCsegment );
 
-	 } // end of y-distribution loop
-       } // end of x-distribution loop
+	         } // end of y-distribution loop
+        } // end of x-distribution loop
 
      } // end of time-ordered hits hits
     
      // state index for random number generator
      state[idx] =  localState;
      
-     //atomicAdd( &(fillSumArray[ ibatch*nsegs*fill_buffer_max_length + 100 ]), 999. ); // debuging
+     //atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + 100 ]), 999. ); // debuging
    } // end of if idx < nFillsPerFlush
 }
 
@@ -539,6 +581,19 @@ namespace  QSimulation
     fillnoise = t_fillnoise;
     flashgainsag = t_flashgainsag;
 
+    //Template
+    TemplateSize = 2000;
+    TemplateZero = 200;
+    IntegratedPulseTemplate = std::vector<float>(TemplateSize);
+    for (int i=TemplateZero;i<TemplateSize;i++)
+    {
+      IntegratedPulseTemplate[i] = 1.0;
+    }
+    
+    //Arrays
+
+    ArraySizes["pulseTemplate"] = TemplateSize*sizeof(float); // pulse template array
+
     ArraySizes["fillSumArray"] = nFillsPerBatch*nsegs*fill_buffer_max_length*sizeof(float); // single fill array
     ArraySizes["fillSumArrayPed"] = nFillsPerBatch*nsegs*fill_buffer_max_length*sizeof(float); // single fill pedestal array
 
@@ -594,7 +649,7 @@ namespace  QSimulation
   int QSim::Simulate(int NFlushes)
   {
     cudaError err;
-    int NSim = NFlushes/nFillsPerBatch + 1;
+    int NSim = NFlushes*nFillsPerFlush/nFillsPerBatch + 1;
     //Clean device memory
     for (auto it=ArraySizes.begin();it!=ArraySizes.end();++it)
     {
@@ -603,6 +658,11 @@ namespace  QSimulation
       cudaMemset( DeviceArrays[Name], 0.0, Size);
     }
 
+    //Load template
+    
+    cudaMemcpy( DeviceArrays["pulseTemplate"],HostArrays["pulseTemplate"], ArraySizes["pulseTemplate"], cudaMemcpyHostToDevice);
+    
+
     for (int i=0;i<NSim;i++)
     {
       
@@ -610,8 +670,9 @@ namespace  QSimulation
       // make the fills
       int nblocks = nFillsPerBatch * nFillsPerFlush / nThreadsPerBlock + 1;
 
-      std::cout << nblocks<<std::endl;
-      make_randfill<<<nblocks,nThreadsPerBlock>>>( d_state, DeviceArrays["hitSumArray"], DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["energySumArray"], nElectronsPerFill, fill_buffer_max_length, nFillsPerBatch, nFillsPerFlush, threshold, fillnoise, flashgainsag);
+      //std::cout << nblocks<<std::endl;
+      std::cout << "Simulating " << i*nFillsPerBatch/nFillsPerFlush <<" flushes "<<std::endl;
+      make_randfill<<<nblocks,nThreadsPerBlock>>>( d_state,DeviceArrays["pulseTemplate"], DeviceArrays["hitSumArray"], DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["energySumArray"],TemplateSize,TemplateZero, nElectronsPerFill, fill_buffer_max_length, nFillsPerBatch, nFillsPerFlush, threshold, fillnoise, flashgainsag);
       cudaDeviceSynchronize();
       err=cudaGetLastError();
       if(err!=cudaSuccess) {
@@ -677,6 +738,29 @@ namespace  QSimulation
       }
     }
     
+    return 0;
+  }
+
+  int QSim::SetIntegratedPulseTemplate(std::vector<float> temp,int Size,int ZeroIndex)
+  {
+    if (Size != TemplateSize)
+    {
+      free(HostArrays["pulseTemplate"]);
+      cudaFree(DeviceArrays["pulseTemplate"]);
+
+      HostArrays["pulseTemplate"] = (float *)malloc(Size*sizeof(float));
+      cudaMalloc( (void **)&DeviceArrays["pulseTemplate"], Size*sizeof(float));
+    }
+    TemplateSize = Size;
+    TemplateZero = ZeroIndex;
+    IntegratedPulseTemplate = temp;
+    IntegratedPulseTemplate.resize(TemplateSize);
+
+    for (int i=TemplateZero;i<TemplateSize;i++)
+    {
+      HostArrays["pulseTemplate"][i] = IntegratedPulseTemplate[i];
+    }
+
     return 0;
   }
 

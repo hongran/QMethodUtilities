@@ -5,11 +5,18 @@
 
 #include "TH1.h"
 #include "TFile.h"
+#include "TSpline.h"
+
+std::vector<float> IntegratePulsedTemplate(std::string TemplatePath,int CrystalId,int TemplateSize,int TemplateZero);
 
 int main()
 {
+  //Get Template
+  auto Template = IntegratePulsedTemplate("/home/hongran/QMethodUtilities/Simulation/templates",25,2000,200);
+
   QSimulation::QSim QSimulator(256,1,500,1024,-999,4,false,false);
-  QSimulator.Simulate(2048);
+  QSimulator.SetIntegratedPulseTemplate(Template,2000,200);
+  QSimulator.Simulate(100000);
   
   std::vector<double> QHist;
   QSimulator.GetCaloArray("fillSumArray",QHist);
@@ -21,9 +28,16 @@ int main()
   {
     h->SetBinContent(i,QHist[i]);
   }
+  
+  TH1 * hTemplate = new TH1D("Template","Template",2000,-20,180);
+  for (int i=0;i<2000;i++)
+  {
+    hTemplate->SetBinContent(i,Template[i]);
+  }
 
   TFile* FileOut = new TFile("TestOut.root","recreate");
   h->Write();
+  hTemplate->Write();
   FileOut->Close();
 
   delete FileOut;
@@ -31,3 +45,32 @@ int main()
 
   return 0;
 }
+
+std::vector<float> IntegratePulsedTemplate(std::string TemplatePath,int CrystalId,int TemplateSize,int TemplateZero )
+{
+  std::string FileName = TemplatePath + "/template" + std::to_string(CrystalId) + ".root";
+  TFile * TemplateFile = new TFile(FileName.c_str(),"read");
+  auto TemplateSpline = (TSpline3*)TemplateFile->Get("masterSpline");
+
+  std::vector<float> Template(TemplateSize);
+
+  float AccumulatedVal = 0.0;
+  for (int i=0;i<TemplateSize;i++)
+  {
+    float t = static_cast<float>(i - TemplateZero)/10.0;
+    float val = TemplateSpline->Eval(t);
+    AccumulatedVal += val;
+    Template[i] = AccumulatedVal;
+  }
+  float norm = Template[TemplateSize-1];
+  for (int i=0;i<TemplateSize;i++)
+  {
+    Template[i] /= norm;
+  }
+
+  TemplateFile->Close();
+  delete TemplateFile;
+
+  return Template;
+}
+

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <string>
 #include <map>
 #include <time.h>
 #include <math.h>
@@ -49,6 +50,10 @@ namespace QSimulation{
       int Simulate(int NFlushes);
       int GetArray(std::string ArrayName,std::vector<double>& Output);
       int GetCaloArray(std::string ArrayName,std::vector<double>& Output);
+      
+      //Set Functions
+      int SetIntegratedPulseTemplate(std::vector<float> temp,int Size,int ZeroIndex);
+      
     private:
       // define nThreadsPerBlock per block for GPU
       int nThreadsPerBlock; //number of threads per block
@@ -65,6 +70,11 @@ namespace QSimulation{
 
       // for state of randum generators
       curandState *d_state;
+
+      //Pulse Shape
+      int TemplateSize;
+      int TemplateZero;
+      std::vector<float> IntegratedPulseTemplate;
 
       // Q-method arrays
       std::map<std::string,float *> HostArrays;

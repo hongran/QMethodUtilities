@@ -63,7 +63,14 @@ class QFit{
     TF1 GetFitFunction();
     TH1* GetResidual();
     TH1* GetResidualFFT();
+    TH1* GetFieldDistribution();
+    TH1* GetHistogram(std::string Function,std::string HistName,int Norm, int NBins, double TStart,double TEnd);
+
+    //Set Functions
+    int SetFieldDistribution(TH1* fieldDist);
+    //Fit Function
     TF1 Fit(TH1 *hist,double FitStart,double FitEnd,std::string fName=std::string("f5ParFit"));
+    
   private:
     //data set name
     std::string fDataSet;
@@ -75,6 +82,8 @@ class QFit{
     //Residual
     TH1* hResidual_;
     TH1* hResFFT_;
+    //Field
+    TH1* hFieldDistribution_;
 };
 
 QFit::QFit(std::string DataSetName):fDataSet(DataSetName)
@@ -113,11 +122,19 @@ QFit::QFit(std::string DataSetName):fDataSet(DataSetName)
   fFunctionMap_["f10ParFit"].SetNpx(2000);
   fFunctionMap_["f10ParFit"].SetParameters(1.44,-4.7,0.232,64.33,2.45e8,0.0,0.29,143.3,2.33,0.0);
   fFunctionMap_["f10ParFit"].FixParameter(5,0.0);
+
+  //Residual
+  hResidual_ = nullptr;
+  hResFFT_ = nullptr;
+  
+  //Default Field Distribution
+  hFieldDistribution_ = new TH1D("FieldDistribution","FieldDistribution",1,-1e-9,1e-9);
+  hFieldDistribution_->SetBinContent(1,1);
 }
 
 QFit::~QFit()
 {
-  ;
+  //Let root handle this by itself
 }
 
 
@@ -139,6 +156,56 @@ TH1* QFit::GetResidual()
 TH1* QFit::GetResidualFFT()
 {
   return (TH1*)hResFFT_->Clone();
+}
+
+TH1* QFit::GetFieldDistribution()
+{
+  return (TH1*)hFieldDistribution_->Clone();
+}
+
+TH1* QFit::GetHistogram(std::string Function,std::string HistName,int Norm, int NBins ,double TStart,double TEnd)
+{
+  if (fFunctionMap_.find(Function) == fFunctionMap_.end())
+  {
+    std::cout << "Function " << Function <<" is not found."<<std::endl;
+  }
+  auto func = fFunctionMap_[Function];
+  
+  TH1* Hist = new TH1D(HistName.c_str(),HistName.c_str(),NBins,TStart,TEnd);
+
+  int NField = hFieldDistribution_->GetNbinsX();
+
+  double omega_0 = func.GetParameter(0);
+
+  for (int j=1;j<=NField;j++)
+  {
+    double shift = hFieldDistribution_->GetBinCenter(j)*1e-6;
+    double weight = hFieldDistribution_->GetBinContent(j);
+    std::cout << "shift "<<shift<<" ; weight "<<weight<<std::endl;
+    func.SetParameter(0,omega_0*(1.0+shift));
+    func.SetParameter(4,Norm*weight);
+
+    for (int i=1;i<=NBins;i++)
+    {
+      double x = Hist->GetBinCenter(i);
+      double y = func.Eval(x);
+      double y_new = Hist->GetBinContent(i) + y;
+      Hist->SetBinContent(i,y_new);
+      Hist->SetBinError(i,sqrt(y_new));
+    }
+  }
+
+  return Hist;
+}
+
+int QFit::SetFieldDistribution(TH1* fieldDist)
+{
+  if (hFieldDistribution_ != nullptr)
+  {
+    delete hFieldDistribution_;
+  }
+  hFieldDistribution_ = (TH1*)fieldDist->Clone();
+  return 0;
 }
 
 TF1 QFit::Fit(TH1 *hist,double FitStart,double FitEnd,std::string fName)
@@ -189,4 +256,5 @@ TF1 QFit::Fit(TH1 *hist,double FitStart,double FitEnd,std::string fName)
 
   return fFunctionMap_[fFitName_];
 }
+
 
