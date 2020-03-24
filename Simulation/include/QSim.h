@@ -33,7 +33,7 @@
 
 //constants
 const int nsPerFill = 337500;
-const int nsPerTick = 1000./800.;
+const float nsPerTick = 1000./800.;
 const int qBinSize = TIMEDECIMATION*nsPerTick;
 const double GeVToADC = 1013.0;
 const double PeakBinFrac = 0.4;

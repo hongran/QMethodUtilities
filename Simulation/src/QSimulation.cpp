@@ -23,10 +23,11 @@ int main()
 
   unsigned int N = QHist.size();
 
-  TH1 * h = new TH1D("test","test",N,0,N);
+  TH1 * h = new TH1D("test","test",N,0,N*0.075);
   for (unsigned int i=0;i<N;i++)
   {
     h->SetBinContent(i,QHist[i]);
+    h->SetBinError(i,sqrt(QHist[i]));
   }
   
   TH1 * hTemplate = new TH1D("Template","Template",2000,-20,180);

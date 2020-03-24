@@ -328,6 +328,15 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
       //Time distribution
       float TimeBinFractions[5];
       int TickEdgeIndex = rtick*10 - TemplateZero; 
+      /*
+      //Try first delta shape pulse
+      TimeBinFractions[0] = 0.0;
+      TimeBinFractions[1] = 1.0;
+      for (int tempIdx=2;tempIdx<5;tempIdx++)
+      {
+        TimeBinFractions[tempIdx] = 0.0;
+      }*/
+      
       if (TickEdgeIndex > 0)
       {
         TimeBinFractions[0] = pulseTemplate[TickEdgeIndex];
