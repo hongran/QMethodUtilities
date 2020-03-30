@@ -5,18 +5,23 @@
 
 #include "TH1.h"
 #include "TFile.h"
+#include "TString.h"
 #include "TSpline.h"
 
 std::vector<float> IntegratePulsedTemplate(std::string TemplatePath,int CrystalId,int TemplateSize,int TemplateZero);
 
-int main()
+int main(int argc, char ** argv)
 {
+  //Get Input arguments
+  int RunNumber = std::stoi(std::string(argv[1]));
+  int NFlushes = std::stoi(std::string(argv[2]));
+  int NFillsPerBatch = std::stoi(std::string(argv[3]));
   //Get Template
-  auto Template = IntegratePulsedTemplate("/home/hongran/QMethodUtilities/Simulation/templates",25,2000,200);
+  auto Template = IntegratePulsedTemplate("/home/rhong/QMethodUtilities/Simulation/templates",25,2000,200);
 
-  QSimulation::QSim QSimulator(256,1,500,1024,-999,4,false,false);
+  QSimulation::QSim QSimulator(256,1,500,NFillsPerBatch,-999,4,false,false);
   QSimulator.SetIntegratedPulseTemplate(Template,2000,200);
-  QSimulator.Simulate(100000);
+  QSimulator.Simulate(NFlushes);
   
   std::vector<double> QHist;
   QSimulator.GetCaloArray("fillSumArray",QHist);
@@ -35,7 +40,7 @@ int main()
     hTemplate->SetBinContent(i,Template[i]);
   }
 
-  TFile* FileOut = new TFile("TestOut.root","recreate");
+  TFile* FileOut = new TFile(Form("TestOut_%04d.root",RunNumber),"recreate");
   h->Write();
   hTemplate->Write();
   FileOut->Close();
