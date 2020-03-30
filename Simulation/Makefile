@@ -54,7 +54,8 @@ endif
 ROOT_FLAGS += $(shell root-config --cflags)
 ROOT_LIBS  += $(shell root-config --libs)
 
-GPU_FLAGS := -std=c++11 -I$(CUDA_HOME)/include -Iinclude
+#GPU_FLAGS := -std=c++11 -I$(CUDA_HOME)/include -Iinclude
+GPU_FLAGS := -I$(CUDA_HOME)/include -Iinclude
 GPU_FLAGS += --compiler-options '-Wall -fPIC'
 GPU_FLAGS += -m64 
 GPU_LIBS += -L$(CUDA_HOME)/lib64 -lcudart -lcufft -lcusolver -lcublas -lcurand -lm -lgomp
