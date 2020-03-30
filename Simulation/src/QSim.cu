@@ -73,7 +73,7 @@ fills array fillSumArray[] of size fillls per batch * xtals * time bins with ADC
 also fills hitSumArray (fake Tmethod), energySumArray (diagnostics)
 of size xtals * time bins (they contain all hits, energy, etc in batch)
 */
-__global__ void make_randfill( curandState *state, float *pulseTemplate, float *hitSumArray, float *fillSumArray,float *fillSumArrayPed,  float *energySumArray, int TemplateSize, int TemplateZero, int NElectronsPerFill, int fill_buffer_max_length, int nFillsPerBatch, int nFillsPerFlush, float threshold, bool fillnoise, bool flashgainsag) {
+__global__ void make_randfill( curandState *state, float *pulseTemplate, float *hitSumArray, float *fillSumArray,float *fillSumArrayPed,  float *energySumArray, float *analyzedQSumArray, float *analysisParameters ,int TemplateSize, int TemplateZero, int NElectronsPerFill, int fill_buffer_max_length, int nFillsPerBatch, int nFillsPerFlush, float threshold, bool fillnoise, bool flashgainsag, bool realtime_analysis) {
   // single thread make complete fill with NElectronsPerFill electrons
 
    const float tau = 6.4e4;                              // muon time-dilated lifetime (ns)
@@ -432,6 +432,9 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
      state[idx] =  localState;
      
      //atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + 100 ]), 999. ); // debuging
+
+     //Analysis
+
    } // end of if idx < nFillsPerFlush
 }
 
@@ -611,9 +614,11 @@ namespace  QSimulation
     //Arrays
 
     ArraySizes["pulseTemplate"] = TemplateSize*sizeof(float); // pulse template array
+    ArraySizes["analysisParameters"] = 100*sizeof(float); // Analysis Parameters, max 100
 
     ArraySizes["fillSumArray"] = nFillsPerBatch*nsegs*fill_buffer_max_length*sizeof(float); // single fill array
     ArraySizes["fillSumArrayPed"] = nFillsPerBatch*nsegs*fill_buffer_max_length*sizeof(float); // single fill pedestal array
+    ArraySizes["analyzedQSumArray"] = nFillsPerBatch*nsegs*fill_buffer_max_length*sizeof(float); // single fill array analyzed
 
     ArraySizes["batchSumArray"] = nsegs*fill_buffer_max_length*sizeof(float); 
     ArraySizes["batchSumArrayErr"] = nsegs*fill_buffer_max_length*sizeof(float); 
@@ -690,7 +695,7 @@ namespace  QSimulation
 
       //std::cout << nblocks<<std::endl;
       std::cout << "Simulating " << i*nFillsPerBatch/nFillsPerFlush <<" flushes "<<std::endl;
-      make_randfill<<<nblocks,nThreadsPerBlock>>>( d_state,DeviceArrays["pulseTemplate"], DeviceArrays["hitSumArray"], DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["energySumArray"],TemplateSize,TemplateZero, nElectronsPerFill, fill_buffer_max_length, nFillsPerBatch, nFillsPerFlush, threshold, fillnoise, flashgainsag);
+      make_randfill<<<nblocks,nThreadsPerBlock>>>( d_state,DeviceArrays["pulseTemplate"], DeviceArrays["hitSumArray"], DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["energySumArray"], DeviceArrays["analyzedQSumArray"],DeviceArrays["analysisParameters"],TemplateSize,TemplateZero, nElectronsPerFill, fill_buffer_max_length, nFillsPerBatch, nFillsPerFlush, threshold, fillnoise, flashgainsag,true);
       cudaDeviceSynchronize();
       err=cudaGetLastError();
       if(err!=cudaSuccess) {
