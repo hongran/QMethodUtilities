@@ -365,12 +365,21 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
        // we're now going to distribute the ADC signal accross x,y segments and time bins filling the array fillSumArray of size time bins * xsegs * ysegs
 
        // loop over the array of xtals and distribute the total ADC counts (ADC) to each xtal (ADC segment) using the hit coordinates xcoord, ycoords and spreads xsig, ysig. 
+      //Calculating the gaussian integral for each x or y segments
        float fsegmentsum = 0.0; // diagnostic parameter for distribution of energy over segments
+       float SegmentX[NXSEG];
+       float SegmentY[NYSEG];
+       for (int ix = 0; ix < nxseg; ix++) {
+           SegmentX[ix] = 0.5*(-erfcf((ix+1.0-xcoord)/(sqrt(2.)*xsig))+erfcf((ix-xcoord)/(sqrt(2.)*xsig)));
+       }
+       for (int iy = 0; iy < nyseg; iy++) {
+           SegmentY[iy] = 0.5*(-erfcf((iy+1.0-xcoord)/(sqrt(2.)*ysig))+erfcf((iy-ycoord)/(sqrt(2.)*ysig)));
+       }
        for (int ix = 0; ix < nxseg; ix++) {
 	       for (int iy = 0; iy < nyseg; iy++) { 	   // calc energy in segment (assume aGaussian distribution about xc, yc)
-           float fsegmentx = 0.5*(-erfcf((ix+1.0-xcoord)/(sqrt(2.)*xsig))+erfcf((ix-xcoord)/(sqrt(2.)*xsig)));
-	         float fsegmenty = 0.5*(-erfcf((iy+1.0-ycoord)/(sqrt(2.)*ysig))+erfcf((iy-ycoord)/(sqrt(2.)*ysig)));
-           float fsegment = fsegmentx*fsegmenty;
+//           float fsegmentx = 0.5*(-erfcf((ix+1.0-xcoord)/(sqrt(2.)*xsig))+erfcf((ix-xcoord)/(sqrt(2.)*xsig)));
+//	         float fsegmenty = 0.5*(-erfcf((iy+1.0-ycoord)/(sqrt(2.)*ysig))+erfcf((iy-ycoord)/(sqrt(2.)*ysig)));
+           float fsegment = SegmentX[ix]*SegmentY[iy];
 	         float ADCsegment = fsegment*ADC;
            fsegmentsum += fsegment;
 	         if (ADCsegment < 1.0) continue; // avoid pileup calc if signal in xtal is neglibible

@@ -16,7 +16,7 @@ int main()
 
   QSimulation::QSim QSimulator(256,1,500,1024,-999,4,false,false);
   QSimulator.SetIntegratedPulseTemplate(Template,2000,200);
-  QSimulator.Simulate(100000);
+  QSimulator.Simulate(1000000);
   
   std::vector<double> QHist;
   QSimulator.GetCaloArray("fillSumArray",QHist);
