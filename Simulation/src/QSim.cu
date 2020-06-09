@@ -73,11 +73,28 @@ fills array fillSumArray[] of size fillls per batch * xtals * time bins with ADC
 also fills hitSumArray (fake Tmethod), energySumArray (diagnostics)
 of size xtals * time bins (they contain all hits, energy, etc in batch)
 */
-__global__ void make_randfill( curandState *state, float *pulseTemplate, float *hitSumArray, float *fillSumArray,float *fillSumArrayPed,  float *energySumArray, float *analyzedQSumArray, float *analysisParameters ,int TemplateSize, int TemplateZero, int NElectronsPerFill, int fill_buffer_max_length, int nFillsPerBatch, int nFillsPerFlush, float threshold, bool fillnoise, bool flashgainsag, bool realtime_analysis) {
+__global__ void make_randfill( curandState *state, float *pulseTemplate, float *pedestalTemplate, float *hitSumArray, float *fillSumArray,float *fillSumArrayPed,  float *energySumArray, float *analyzedQSumArray, int *SimulationIntParameters, float * SimulationParameters, int * AnalysisIntParameters, float * AnalysisParameters){
+
+  int TemplateSize = SimulationIntParameters[5]; 
+  int TemplateZero = SimulationIntParameters[6];
+  int NElectronsPerFill = SimulationIntParameters[2]; 
+  int fill_buffer_max_length = SimulationIntParameters[1];
+  int nFlushesPerBatch = SimulationIntParameters[4];
+  int nFillsPerFlush = SimulationIntParameters[3];
+
+  float threshold = AnalysisParameters[0];
+  int window = AnalysisIntParameters[1];
+  int gap = AnalysisIntParameters[2];
+  bool fillnoise = SimulationIntParameters[7]; 
+  bool flashgainsag = SimulationIntParameters[8];
+  bool realtime_analysis = AnalysisIntParameters[0];
+
+  float noise = SimulationParameters[1];
+
   // single thread make complete fill with NElectronsPerFill electrons
 
    const float tau = 6.4e4;                              // muon time-dilated lifetime (ns)
-   const float omega_a = 1.438000e-3;                    // muon anomalous precession frequency (rad/ns)
+   float omega_a = SimulationParameters[0];                    // muon anomalous precession frequency (rad/ns)
    const float magicgamma = 29.3;                        // gamma factor for magic momentum 3.094 GeV/c
    const float SimToExpCalCnst = 0.057;                  // energy-ADC counts conversion (ADC counts / energy GeV)
    const float qBinSize = TIMEDECIMATION*1000/800;        // Q-method histogram bin size (ns), accounts for 800MHz sampling rate
@@ -115,10 +132,11 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
    int idx = blockIdx.x*blockDim.x + threadIdx.x;
 
    // one thread per fill - max threads is "fills in flush" * "flushes in batch"
-   if (idx < nFillsPerBatch * nFillsPerFlush) {
+//   printf("idx, FlushPerBatch, FillPerFlush: %d,%d,%d\n",idx,nFlushesPerBatch,nFillsPerFlush);
+   if (idx < nFlushesPerBatch * nFillsPerFlush) {
 
-     int iflush = idx / nFillsPerFlush; // fills are launched in blocks of nFillsPerBatch * nFillsPerFlush, iflush is flush index within flush batch
-     int ifill = idx % nFillsPerFlush;  // fills are launched in nlocks of nFillsPerBatch * nFillsPerFlush, ifill is fill index within individual flush
+     int iflush = idx / nFillsPerFlush; // fills are launched in blocks of nFlushesPerBatch * nFillsPerFlush, iflush is flush index within flush batch
+     int ifill = idx % nFillsPerFlush;  // fills are launched in nlocks of nFlushesPerBatch * nFillsPerFlush, ifill is fill index within individual flush
 
      // state index for random number generator
      curandState localState = state[idx];
@@ -158,8 +176,8 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
 	       //float noise = pedestal + sigma * curand_normal(&localState); // pedestal w/ noise
 	       //state[ nFillsPerBatch*nsegs*fill_buffer_max_length + i] = localState; // pedestal w/ noise
 	       float noise = pedestal; // pedestal w/o noise
-	       atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + i ]), noise ); // fill with noise for particular fill in batch
-	       atomicAdd( &(fillSumArrayPed[ iflush*nsegs*fill_buffer_max_length + i ]), noise ); // fill with noise for particular fill in batch
+//	       atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + i ]), noise ); // fill with noise for particular fill in batch
+//	       atomicAdd( &(fillSumArrayPed[ iflush*nsegs*fill_buffer_max_length + i ]), noise ); // fill with noise for particular fill in batch
 	     } // end loop over samples * xtals
       } // end if fill-by-fill noise
 
@@ -216,7 +234,8 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
        // variable ADC is total ADC samples of positron signal at 800 MMz sampling rate with 6.2 GeV max range over 2048 ADC counts
        ADC = GeVToADC*Elab; 
        // divide by maximum fraction of positron signal in single 800 MHz bin (is ~0.4 from erfunc plot of 5ns FWHM pulse in peak sample at 800 MHz sampling rate)
-       ADC = ADC/PeakBinFrac; 
+       //TODO: Will check this issue back later
+       //ADC = ADC/PeakBinFrac; 
 
        // add empirical energy-dependent drift time, see https://muon.npl.washington.edu/elog/g2/Simulation/229 using empirical energy and time relation
        ylab = Elab/Elab_max;
@@ -224,9 +243,11 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
 	 + p5*ylab*ylab*ylab*ylab*ylab + p6*ylab*ylab*ylab*ylab*ylab*ylab + p7*ylab*ylab*ylab*ylab*ylab*ylab*ylab 
 	 + p8*ylab*ylab*ylab*ylab*ylab*ylab*ylab*ylab + p9*ylab*ylab*ylab*ylab*ylab*ylab*ylab*ylab*ylab; // phase in mSR units of omega_a, max is 5.14662666320800781e+01 msr
        drifttime = anomalousperiod * phase / (2.*Pi*1000.); // convert the omega_a phase to drift time in Q-method histogram bin units
+       /*
        tick = tick + drifttime; // add drift time to decay time
        itick = (int)tick;
-
+       //do this later
+*/
        // if using energySumArray flush buffer
 //       atomicAdd( &(energySumArray[ (int)(ADC/TIMEDECIMATION) ]), 1.0); // diagnostic for energy time distributions
    
@@ -244,10 +265,7 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
 	       xmax = 185.;
        }
        xrand = curand_uniform(&localState);
-       xcoord = xmax*xrand/25.0; // x-coordinate -> segment/xtal units
-       yrand = curand_uniform(&localState);
-       ycoord = 1.0+(nyseg-2.0)*yrand; // y-coordinate -> segment/xtal units
-
+       xcoord = xmax*xrand/25.0; // x-coordinate -> segment/xtal unitsNFlushes
        // put hit information (time, ADC counts, x/y coordinates, hit index) into hit array needed for applying pile-up effects
        tickstore[nhit] = tick;
        ADCstore[nhit] = ADC;
@@ -263,7 +281,8 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
      // sort array of positron hits into ascending time-order
      int itemp;
      float ftemp;
-     thrust::sort(thrust::seq, tickstore, tickstore+nhit);
+     //TODO: deal with pile up study later
+//     thrust::sort(thrust::seq, tickstore, tickstore+nhit);
      /*
      for (int i = 0; i < nhit; ++i) {
        for (int j = i + 1; j < nhit; ++j) {
@@ -278,6 +297,19 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
        }
      }
      */
+     //Clear the fill-by-fill array
+
+     for (int ix = 0; ix < nxseg; ix++) {
+       for (int iy = 0; iy < nyseg; iy++) { 	   // calc energy in segment (assume aGaussian distribution about xc, yc)
+	 // array offset needed for storing xtal hits in samples array
+	 int xysegmentoffset = (ix+iy*nxseg)*fill_buffer_max_length; 
+
+	 for (int k=0; k<fill_buffer_max_length; k++) {
+	   fillSumArrayPed[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + k ] = 0.0; 
+	 }
+
+       } // end of y-distribution loop
+     } // end of x-distribution loop
 
      // parameters for empirical Gaussian distribution of energy across neighboring segments. 
 
@@ -290,10 +322,7 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
      // parameters for distributing the ADC counts over time bins of q-method histogram 
 
      // approx sigma width of 2.1ns from https://muon.npl.washington.edu/elog/g2/SLAC+Test+Beam+2016/38
-     //float width = 0.021/qBinSize; // test - make pulse width x10 smaller
-     //float width = 0.21/qBinSize; // test - make pulse width x10 smaller
-     //float width = 21.0/qBinSize; // test  - make pulse width x10 larger
-     float width = 2.1/qBinSize; // pulse sigma in q-method bin width units
+     //float width = 2.1/qBinSize; // pulse sigma in q-method bin width units
 
      // parameters for pile-up effects 
 
@@ -306,9 +335,14 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
      for (int i = 0; i < nhit; i++){      // loop over time-ordered positron hits
       
        tick = tickstore[i]; // time array is already time-ordered
+       ADC = ADCstore[i]; // ADC, x, y arrays aren't already time-ordered
+       xcoord = xcoordstore[i];
+       ycoord = ycoordstore[i];
+       /*
        ADC = ADCstore[iold[i]]; // ADC, x, y arrays aren't already time-ordered
        xcoord = xcoordstore[iold[i]];
        ycoord = ycoordstore[iold[i]];
+       */
        //printf("x, y %f, %f, ADC %f, tick %f\n", xcoord, ycoord, ADC, tick); // debugging
 
 	//  add effects of injection flash via time-dependent gain sag 
@@ -382,7 +416,7 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
            float fsegment = SegmentX[ix]*SegmentY[iy];
 	         float ADCsegment = fsegment*ADC;
            fsegmentsum += fsegment;
-	         if (ADCsegment < 1.0) continue; // avoid pileup calc if signal in xtal is neglibible
+//	         if (ADCsegment < 1.0) continue; // avoid pileup calc if signal in xtal is neglibible
            
 	         // array offset needed for storing xtal hits in samples array
 	         int xysegmentoffset = (ix+iy*nxseg)*fill_buffer_max_length; 
@@ -393,11 +427,12 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
              if ( kk < 0 || kk >= fill_buffer_max_length ) continue;
              float ADCfrac = ADCsegment*TimeBinFractions[k]; 
 
-             if ( ADCfrac >= 1 ) {
-              //printf("xtal %i, ADCfrac %f\n", ix+iy*nxseg, ADCfrac);
-              atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + kk ]), ADCfrac/TIMEDECIMATION); // divide by time decimation to account for data processing calculates the time-decimated average not sum
-             }
-           }
+//	     if ( ADCfrac >= 1 ) {
+	       //printf("xtal %i, ADCfrac %f\n", ix+iy*nxseg, ADCfrac);
+	       atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + kk ]), ADCfrac/TIMEDECIMATION); // divide by time decimation to account for data processing calculates the time-decimated average not sum
+	       fillSumArrayPed[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + kk ] = ADCfrac/TIMEDECIMATION; // Keep this array only to this fill and use it for analysis, add pedestal later
+//	     }
+	   }
            //OBSOLETE do time smearing of positron pulse over several contiguous time bins, just loop over bins k-1, k, k+1 as negligible in other bins   
            /*
 	         float tfracsum = 0.0; // diagnostic for distribution of energy over segments
@@ -427,13 +462,49 @@ __global__ void make_randfill( curandState *state, float *pulseTemplate, float *
         } // end of x-distribution loop
 
      } // end of time-ordered hits hits
-    
+
+     //Add pedestal
+     for (int ix = 0; ix < nxseg; ix++) {
+       for (int iy = 0; iy < nyseg; iy++) { 	   // calc energy in segment (assume aGaussian distribution about xc, yc)
+	 // array offset needed for storing xtal hits in samples array
+	 int xysegmentoffset = (ix+iy*nxseg)*fill_buffer_max_length; 
+
+	 for (int k=35; k<fill_buffer_max_length; k++) {
+	   ;
+	   atomicAdd( &(fillSumArrayPed[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + k ]), pedestalTemplate[k]); 
+	 }
+
+       } // end of y-distribution loop
+     } // end of x-distribution loop
+
      // state index for random number generator
      state[idx] =  localState;
      
      //atomicAdd( &(fillSumArray[ iflush*nsegs*fill_buffer_max_length + 100 ]), 999. ); // debuging
 
-     //Analysis
+     //Analysis, based on fillSumArrayPed, which is updated per fill
+     for (int ix = 0; ix < nxseg; ix++) {
+       for (int iy = 0; iy < nyseg; iy++) { 	
+	 for (int i = 0; i < nhit; i++){      // loop over time-ordered positron hits
+	   int xysegmentoffset = (ix+iy*nxseg)*fill_buffer_max_length; 
+	   tick = tickstore[i]; // time array is already time-ordered
+	   int itick = (int) tick;
+           if (itick < window+gap || itick >= fill_buffer_max_length-window-gap) 
+	   {
+	     continue;
+	   }
+	   float avg = 0.0;
+           for (int k=0; k<window; k++) 
+	   {
+	     avg += fillSumArrayPed[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + itick - gap - k ];
+	     avg += fillSumArrayPed[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + itick + gap + k ];
+	   }
+	   avg /= (2.0*window);
+
+	   atomicAdd( &(analyzedQSumArray[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + itick ]), fillSumArrayPed[ iflush*nsegs*fill_buffer_max_length + xysegmentoffset + itick ] - avg); 
+	 }
+       }
+     }
 
    } // end of if idx < nFillsPerFlush
 }
@@ -586,46 +657,58 @@ __global__ void make_flushbatchsum( curandState *state, float *fillSumArray, flo
 
 namespace  QSimulation
 {
-  QSim::QSim(int t_nThreadsPerBlock,int t_nFillsPerFlush,int t_NElectronsPerFill,int t_nFillsPerBatch,float t_threshold,int t_window,bool t_fillnoise,bool t_flashgainsag)
+  QSim::QSim(const std::map<std::string,float> & tFloatParameters, const std::map<std::string,int>& tIntParameters,long long int tSeed)
   {
+    //Import Parameters
+    FloatParameters = tFloatParameters;
+    IntParameters = tIntParameters;
+
+    //Additional Parameters
+    IntParameters["FillBufferMaxLength"] = nsPerFill / qBinSize;
+
+    //Init Parameter Arrays
+    InitParameters();
+
+    //Allocate Derive memory for parameters
+
+    cudaMalloc( (void **)&d_SimulationParameters, SimulationParameters.size()*sizeof(float));
+    cudaMalloc( (void **)&d_SimulationIntParameters, SimulationIntParameters.size()*sizeof(int));
+    cudaMalloc( (void **)&d_AnalysisParameters, AnalysisParameters.size()*sizeof(float));
+    cudaMalloc( (void **)&d_AnalysisIntParameters, AnalysisIntParameters.size()*sizeof(int));
+    
+    cudaMemcpy( d_SimulationParameters,&SimulationParameters[0], SimulationParameters.size()*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy( d_SimulationIntParameters,&SimulationIntParameters[0], SimulationIntParameters.size()*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy( d_AnalysisParameters,&AnalysisParameters[0], AnalysisParameters.size()*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy( d_AnalysisIntParameters,&AnalysisIntParameters[0], AnalysisIntParameters.size()*sizeof(float), cudaMemcpyHostToDevice);
+
     cudaError err;
 
-    nThreadsPerBlock = t_nThreadsPerBlock;
-    nFillsPerFlush = t_nFillsPerFlush;
-    nElectronsPerFill = t_NElectronsPerFill;
-    nFillsPerBatch = t_nFillsPerBatch;
-
-    fill_buffer_max_length = nsPerFill / qBinSize;
-
-    threshold = t_threshold;
-    window = t_window;
-    fillnoise = t_fillnoise;
-    flashgainsag = t_flashgainsag;
-
     //Template
-    TemplateSize = 2000;
-    TemplateZero = 200;
-    IntegratedPulseTemplate = std::vector<float>(TemplateSize);
-    for (int i=TemplateZero;i<TemplateSize;i++)
+    IntegratedPulseTemplate = std::vector<float>(IntParameters["TemplateSize"]);
+    for (int i=IntParameters["TemplateZero"];i<IntParameters["TemplateSize"];i++)
     {
       IntegratedPulseTemplate[i] = 1.0;
     }
+    PedestalTemplate = std::vector<float>(IntParameters["FillBufferMaxLength"],0.0);
     
     //Arrays
 
-    ArraySizes["pulseTemplate"] = TemplateSize*sizeof(float); // pulse template array
-    ArraySizes["analysisParameters"] = 100*sizeof(float); // Analysis Parameters, max 100
+    int nFillsPerBatch = IntParameters["NFlushesPerBatch"] * IntParameters["NFillsPerFlush"];
 
-    ArraySizes["fillSumArray"] = nFillsPerBatch*nsegs*fill_buffer_max_length*sizeof(float); // single fill array
-    ArraySizes["fillSumArrayPed"] = nFillsPerBatch*nsegs*fill_buffer_max_length*sizeof(float); // single fill pedestal array
-    ArraySizes["analyzedQSumArray"] = nFillsPerBatch*nsegs*fill_buffer_max_length*sizeof(float); // single fill array analyzed
+    ArraySizes["pulseTemplate"] = IntParameters["TemplateSize"]*sizeof(float); // pulse template array
+    //ArraySizes["analysisParameters"] = 100*sizeof(float); // Analysis Parameters, max 100
+    ArraySizes["pedestalTemplate"] = IntParameters["FillBufferMaxLength"]*sizeof(float); // pulse template array
 
-    ArraySizes["batchSumArray"] = nsegs*fill_buffer_max_length*sizeof(float); 
-    ArraySizes["batchSumArrayErr"] = nsegs*fill_buffer_max_length*sizeof(float); 
-    ArraySizes["batchSumArrayR"] = nsegs*fill_buffer_max_length*sizeof(float); 
-    ArraySizes["batchSumArrayRErr"] = nsegs*fill_buffer_max_length*sizeof(float); 
-    ArraySizes["hitSumArray"] = fill_buffer_max_length*sizeof(float); 
-    ArraySizes["PUhitSumArray"] = fill_buffer_max_length*sizeof(float); 
+    ArraySizes["fillSumArray"] = nFillsPerBatch*nsegs*IntParameters["FillBufferMaxLength"]*sizeof(float); // single fill array
+    ArraySizes["fillSumArrayPed"] = nFillsPerBatch*nsegs*IntParameters["FillBufferMaxLength"]*sizeof(float); // single fill pedestal array
+    ArraySizes["analyzedQSumArray"] = nFillsPerBatch*nsegs*IntParameters["FillBufferMaxLength"]*sizeof(float); // single fill array analyzed
+
+    ArraySizes["batchSumArray"] = nsegs*IntParameters["FillBufferMaxLength"]*sizeof(float); 
+    ArraySizes["batchSumArrayErr"] = nsegs*IntParameters["FillBufferMaxLength"]*sizeof(float); 
+    ArraySizes["batchSumArrayR"] = nsegs*IntParameters["FillBufferMaxLength"]*sizeof(float); 
+    ArraySizes["batchSumArrayRErr"] = nsegs*IntParameters["FillBufferMaxLength"]*sizeof(float); 
+    ArraySizes["hitSumArray"] = IntParameters["FillBufferMaxLength"]*sizeof(float); 
+    ArraySizes["PUhitSumArray"] = IntParameters["FillBufferMaxLength"]*sizeof(float); 
 
     // get some cuda device properties
     cudaDeviceProp prop;
@@ -636,7 +719,7 @@ namespace  QSimulation
     printf("Memory Bus Width (bits): %d\n", prop.memoryBusWidth);
     printf("\n\n");
 
-    cudaMalloc( (void **)&d_state, nsegs*nFillsPerBatch*nFillsPerFlush*sizeof(curandState));
+    cudaMalloc( (void **)&d_state, nsegs*nFillsPerBatch*sizeof(curandState));
 
     for (auto it=ArraySizes.begin();it!=ArraySizes.end();++it)
     {
@@ -652,8 +735,13 @@ namespace  QSimulation
       exit(0);
     }
 
-    int nblocks = nFillsPerBatch * nFillsPerFlush / nThreadsPerBlock + 1;
-    init_rand<<<nblocks,nThreadsPerBlock>>>( d_state, 0, time(NULL));
+    int nblocks = nFillsPerBatch / IntParameters["NThreadsPerBlock"] + 1;
+    long long int rand_seed = tSeed;
+    if (rand_seed == 0)
+    {
+      rand_seed = time(NULL);
+    }
+    init_rand<<<nblocks,IntParameters["NThreadsPerBlock"]>>>( d_state, 0, rand_seed);
 
   }
 
@@ -667,12 +755,17 @@ namespace  QSimulation
     {
       cudaFree(it->second);
     }
+
+    cudaFree(d_SimulationParameters);
+    cudaFree(d_SimulationIntParameters);
+    cudaFree(d_AnalysisParameters);
+    cudaFree(d_AnalysisIntParameters);
   }
 
   int QSim::Simulate(int NFlushes)
   {
     cudaError err;
-    int NSim = NFlushes*nFillsPerFlush/nFillsPerBatch + 1;
+    int NSim = NFlushes/IntParameters["NFlushesPerBatch"] + 1;
     //Clean device memory
     for (auto it=ArraySizes.begin();it!=ArraySizes.end();++it)
     {
@@ -684,33 +777,38 @@ namespace  QSimulation
     //Load template
     
     cudaMemcpy( DeviceArrays["pulseTemplate"],HostArrays["pulseTemplate"], ArraySizes["pulseTemplate"], cudaMemcpyHostToDevice);
+    cudaMemcpy( DeviceArrays["pedestalTemplate"],HostArrays["pedestalTemplate"], ArraySizes["pedestalTemplate"], cudaMemcpyHostToDevice);
     
-
+    int nFillsPerBatch = IntParameters["NFlushesPerBatch"] * IntParameters["NFillsPerFlush"];
     for (int i=0;i<NSim;i++)
     {
       
       //Simulate
       // make the fills
-      int nblocks = nFillsPerBatch * nFillsPerFlush / nThreadsPerBlock + 1;
+      int nblocks = nFillsPerBatch / IntParameters["NThreadsPerBlock"] + 1;
 
       //std::cout << nblocks<<std::endl;
-      std::cout << "Simulating " << i*nFillsPerBatch/nFillsPerFlush <<" flushes "<<std::endl;
-      make_randfill<<<nblocks,nThreadsPerBlock>>>( d_state,DeviceArrays["pulseTemplate"], DeviceArrays["hitSumArray"], DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["energySumArray"], DeviceArrays["analyzedQSumArray"],DeviceArrays["analysisParameters"],TemplateSize,TemplateZero, nElectronsPerFill, fill_buffer_max_length, nFillsPerBatch, nFillsPerFlush, threshold, fillnoise, flashgainsag,true);
-      cudaDeviceSynchronize();
-      err=cudaGetLastError();
-      if(err!=cudaSuccess) {
-	      printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
-	      exit(0);
-      }
+      std::cout << "Simulating " << i*IntParameters["NFlushesPerBatch"] <<" flushes "<<std::endl;
 
-      nblocks = ( nsegs * fill_buffer_max_length + nThreadsPerBlock - 1 )/ nThreadsPerBlock;
-      make_flushbatchsum<<<nblocks,nThreadsPerBlock>>>( d_state, DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["batchSumArray"], DeviceArrays["batchSumArrayR"], DeviceArrays["batchSumArrayErr"], DeviceArrays["batchSumArrayRErr"], DeviceArrays["PUhitSumArray"], nFillsPerBatch, nFillsPerFlush, threshold, window, fill_buffer_max_length);
+      //make_randfill<<<nblocks,nThreadsPerBlock>>>( d_state,DeviceArrays["pulseTemplate"], DeviceArrays["hitSumArray"], DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["energySumArray"], DeviceArrays["analyzedQSumArray"],DeviceArrays["analysisParameters"],TemplateSize,TemplateZero, nElectronsPerFill, IntParameters["FillBufferMaxLength"], nFillsPerBatch, nFillsPerFlush, threshold, fillnoise, flashgainsag,true);
+      make_randfill<<<nblocks,IntParameters["NThreadsPerBlock"]>>>( d_state,DeviceArrays["pulseTemplate"],DeviceArrays["pedestalTemplate"], DeviceArrays["hitSumArray"], DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["energySumArray"], DeviceArrays["analyzedQSumArray"],d_SimulationIntParameters, d_SimulationParameters,d_AnalysisIntParameters, d_AnalysisParameters);
+
       cudaDeviceSynchronize();
       err=cudaGetLastError();
       if(err!=cudaSuccess) {
 	      printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
 	      exit(0);
       }
+/*
+      nblocks = ( nsegs * IntParameters["FillBufferMaxLength"] + nThreadsPerBlock - 1 )/ nThreadsPerBlock;
+      make_flushbatchsum<<<nblocks,nThreadsPerBlock>>>( d_state, DeviceArrays["fillSumArray"], DeviceArrays["fillSumArrayPed"], DeviceArrays["batchSumArray"], DeviceArrays["batchSumArrayR"], DeviceArrays["batchSumArrayErr"], DeviceArrays["batchSumArrayRErr"], DeviceArrays["PUhitSumArray"], nFillsPerBatch, nFillsPerFlush, threshold, window, IntParameters["FillBufferMaxLength"]);
+      cudaDeviceSynchronize();
+      err=cudaGetLastError();
+      if(err!=cudaSuccess) {
+	      printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
+	      exit(0);
+      }
+      */
     }
 
     //Copy back to host memory
@@ -720,7 +818,7 @@ namespace  QSimulation
       auto Name = it->first;
       auto Size = it->second;
       cudaMemcpy( HostArrays[Name], DeviceArrays[Name], Size, cudaMemcpyDeviceToHost);
-      std::cout<< n << " "<<Size<<std::endl;
+      std::cout<< n << " "<<Name<<" "<<Size<<std::endl;
       err=cudaGetLastError();
       if(err!=cudaSuccess) {
         printf("Cuda failure with user kernel function make)randfill %s:%d: '%s'\n",__FILE__,__LINE__,cudaGetErrorString(err));
@@ -744,20 +842,26 @@ namespace  QSimulation
     return 0;
   }
 
-  int QSim::GetCaloArray(std::string ArrayName,std::vector<double>& Output)
+  int QSim::GetCaloArray(std::string ArrayName,std::vector<double>& Output,bool BatchSum)
   {
     Output.clear();
-    Output.resize(fill_buffer_max_length,0.0);
+    Output.resize(IntParameters["FillBufferMaxLength"],0.0);
     auto ptr = HostArrays[ArrayName];
+
+    int nFillsPerBatch = IntParameters["NFlushesPerBatch"] * IntParameters["NFillsPerFlush"];
 
     for (unsigned int k=0;k<nFillsPerBatch;k++)
     {
       for (unsigned int j=0;j<nsegs;j++)
       {
-        for (unsigned int i=0;i<fill_buffer_max_length;i++)
+        for (unsigned int i=0;i<IntParameters["FillBufferMaxLength"];i++)
         {
-          Output[i] += ptr[(k*nsegs+j)*fill_buffer_max_length + i];
+          Output[i] += ptr[(k*nsegs+j)*IntParameters["FillBufferMaxLength"] + i];
         }
+      }
+      if (!BatchSum)
+      {
+	break;
       }
     }
     
@@ -766,24 +870,77 @@ namespace  QSimulation
 
   int QSim::SetIntegratedPulseTemplate(std::vector<float> temp,int Size,int ZeroIndex)
   {
-    if (Size != TemplateSize)
-    {
-      free(HostArrays["pulseTemplate"]);
-      cudaFree(DeviceArrays["pulseTemplate"]);
+    free(HostArrays["pulseTemplate"]);
+    cudaFree(DeviceArrays["pulseTemplate"]);
 
-      HostArrays["pulseTemplate"] = (float *)malloc(Size*sizeof(float));
-      cudaMalloc( (void **)&DeviceArrays["pulseTemplate"], Size*sizeof(float));
-    }
-    TemplateSize = Size;
-    TemplateZero = ZeroIndex;
+    HostArrays["pulseTemplate"] = (float *)malloc(Size*sizeof(float));
+    cudaMalloc( (void **)&DeviceArrays["pulseTemplate"], Size*sizeof(float));
+
+    //TemplateSize = Size;
+    //TemplateZero = ZeroIndex;
     IntegratedPulseTemplate = temp;
-    IntegratedPulseTemplate.resize(TemplateSize);
+    IntegratedPulseTemplate.resize(Size);
 
-    for (int i=TemplateZero;i<TemplateSize;i++)
+    for (int i=ZeroIndex;i<Size;i++)
     {
       HostArrays["pulseTemplate"][i] = IntegratedPulseTemplate[i];
     }
 
+    return 0;
+  }
+
+  int QSim::SetPedestalTemplate(std::vector<float> temp)
+  {
+    free(HostArrays["pedestalTemplate"]);
+    cudaFree(DeviceArrays["pedestalTemplate"]);
+    int Size = temp.size();
+    int ReservedSize = ArraySizes["pedestalTemplate"];
+
+    HostArrays["pedestalTemplate"] = (float *)malloc(ReservedSize);
+    cudaMalloc( (void **)&DeviceArrays["pulseTemplate"], ReservedSize);
+
+    PedestalTemplate = temp;
+
+    PedestalTemplate.resize(ReservedSize/sizeof(float),0.0);
+
+    if (Size > ReservedSize/sizeof(float))
+    {
+      Size = ReservedSize;
+    }
+    for (int i=0;i<Size;i++)
+    {
+      HostArrays["pedestalTemplate"][i] = PedestalTemplate[i];
+    }
+
+    return 0;
+  }
+
+  //Private Functions
+  int QSim::InitParameters()
+  {
+    SimulationParameters.resize(2);
+    SimulationIntParameters.resize(9);
+    AnalysisParameters.resize(1);
+    AnalysisIntParameters.resize(3);
+
+    SimulationParameters[0] = FloatParameters["Omega_a"];
+    SimulationParameters[1] = FloatParameters["Noise"];
+
+    SimulationIntParameters[0] = IntParameters["NThreadsPerBlock"];
+    SimulationIntParameters[1] = IntParameters["FillBufferMaxLength"];
+    SimulationIntParameters[2] = IntParameters["NElectronsPerFill"];
+    SimulationIntParameters[3] = IntParameters["NFillsPerFlush"];
+    SimulationIntParameters[4] = IntParameters["NFlushesPerBatch"]; 
+    SimulationIntParameters[5] = IntParameters["TemplateSize"]; 
+    SimulationIntParameters[6] = IntParameters["TemplateZero"]; 
+    SimulationIntParameters[7] = IntParameters["FillNoiseSwitch"]; 
+    SimulationIntParameters[8] = IntParameters["FlashGainSagSwitch"]; 
+
+    AnalysisParameters[0] = FloatParameters["Threshold"];
+
+    AnalysisIntParameters[0] = IntParameters["AnalysisSwitch"];
+    AnalysisIntParameters[1] = IntParameters["Window"];
+    AnalysisIntParameters[2] = IntParameters["Gap"];
     return 0;
   }
 
