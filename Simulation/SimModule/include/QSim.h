@@ -20,11 +20,8 @@
 #include <curand_kernel.h>
 
 #include "Global.h"
-
-// calo parameters
-#define NXSEG 9
-#define NYSEG 6
-#define NSEG 54
+//#include "AnalysisModuleBase.h"
+#include "AnalysisModuleList.h"
 
 // Qmethod parameters
 #define TIMEDECIMATION 60 // 2018 production run
@@ -47,30 +44,32 @@ const int nsegs = nxseg*nyseg;
 namespace QSimulation{
   class QSim{
     public:
-      QSim(const std::map<std::string,float> & tFloatParameters, const std::map<std::string,int>& tIntParameters,long long int tSeed = 0);
+      QSim(const std::map<std::string,int>& tIntParameters,const std::map<std::string,float> & tFloatParameters, const std::map<std::string,std::string> & tStringParameters, long long int tSeed = 0);
       ~QSim();
       int Simulate(int NFlushes);
+      int Output(int RunNumber);
       int GetArray(std::string ArrayName,std::vector<double>& Output);
       int GetCaloArray(std::string ArrayName,std::vector<double>& Output, bool BatchSum = true);
       
       //Set Functions
-      int SetIntegratedPulseTemplate(std::vector<float> temp,int Size,int ZeroIndex);
-      int SetPedestalTemplate(std::vector<float> temp);
+      std::vector<float> GetIntegratedPulseTemplate(){return IntegratedPulseTemplate;}
+      std::vector<float> GetPedestalTemplate(){return PedestalTemplate;}
+      int RegisterAnalysisModule(std::string ModuleName, const std::map<std::string,int>& tIntParameters,const std::map<std::string,float> & tFloatParameters,const std::map<std::string,std::string> & tStringParameters, int nFlushesPerBatch, int FillMaxLength);
       
     private:
       //Parameter Map, arrays and device arrays
-      std::map<std::string,float> FloatParameters;
       std::map<std::string,int> IntParameters;
+      std::map<std::string,float> FloatParameters;
+      std::map<std::string,std::string> StringParameters;
 
       std::vector<float> SimulationParameters;
       std::vector<int> SimulationIntParameters;
-      std::vector<float> AnalysisParameters;
-      std::vector<int> AnalysisIntParameters;
 
       float * d_SimulationParameters;
       int * d_SimulationIntParameters;
-      float * d_AnalysisParameters;
-      int * d_AnalysisIntParameters;
+
+      float * d_IntegratedPulseTemplate;
+      float * d_PedestalTemplate;
 
       // for state of randum generators
       curandState *d_state;
@@ -84,12 +83,17 @@ namespace QSimulation{
       std::map<std::string,float *> DeviceArrays;
       std::map<std::string,int> ArraySizes;
 
+      // Analysis Module array
+      std::map<std::string,QAnalysis::AnalysisModule *> AnaModules;
+
       // for energy array
       //int32_t *h_energyArray, *d_energyArray;
       //float *h_energySumArray, *d_energySumArray;
 
       //Private methods
       int InitParameters();
+      int IntegratePulseTemplate(std::string TemplatePath,int CrystalId,int TemplateSize,int TemplateZero);
+      int LoadPedestalTemplate(std::string TemplatePath,int CrystalId);
   };
 }
 

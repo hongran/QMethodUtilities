@@ -1,0 +1,41 @@
+{
+  "Simulator" : {
+    "Integer Parameters" : {
+      "NThreadsPerBlock" : 256,
+      "NElectronsPerFill" : 20,
+      "NFillsPerFlush" : 1,
+      "NFlushesPerBatch" : 1024,
+      "TemplateSize" : 2000,
+      "TemplateZero" : 200,
+      "FillNoiseSwitch" : 0,
+      "FlashGainSagSwitch" : 0,
+      "AccumulateMode" : 0
+    },
+    "Float Parameters" : {
+      "Omega_a" : 1.43e-3,
+      "Noise" : 0.0
+    },
+    "String Parameters" : {
+      "Pulse Shape" : "Template",
+      "Pedestal Shape" : "Template",
+      "Pulse Template Path" : "/home/hongran/QMethodUtilities/Simulation/templates",
+      "Pedestal Template Path" : "/home/hongran/QMethodUtilities/Simulation/templates"
+    }
+  },
+  "Analyzers" :[
+    {
+      "Name" : "RHAnalysis",
+      "Enable" : true,
+      "Integer Parameters" : {
+	"NThreadsPerBlock" : 256,
+        "Window" : 4,
+        "Gap" : 2
+      },
+      "Float Parameters" : {
+        "Threshold" : 0.0
+      },
+      "String Parameters" : {
+      }
+    }
+  ]
+}

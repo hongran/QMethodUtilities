@@ -2,6 +2,8 @@
 #define UTIL_H
 
 #include <string>
+#include <iostream>
+#include <fstream>
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -43,4 +45,28 @@ json GetStructFromJson(const json& InputStruct,std::string key)
   json empty;
   return empty;
 }
+
+int JsonToStructs(const json & Config, std::map<std::string,int>& IntParameters, std::map<std::string,float>& FloatParameters, std::map<std::string, std::string>& StringParameters)
+{
+  json ConfigInt = Config["Integer Parameters"];
+  json ConfigFloat = Config["Float Parameters"];
+  json ConfigString = Config["String Parameters"];
+
+  for (json::iterator it = ConfigInt.begin(); it != ConfigInt.end(); ++it)
+  {
+    IntParameters[it.key()] = GetValueFromJson<int>(ConfigInt,it.key());
+  }
+
+  for (json::iterator it = ConfigFloat.begin(); it != ConfigFloat.end(); ++it)
+  {
+    FloatParameters[it.key()] = GetValueFromJson<float>(ConfigFloat,it.key());
+  }
+
+  for (json::iterator it = ConfigString.begin(); it != ConfigString.end(); ++it)
+  {
+    StringParameters[it.key()] = GetValueFromJson<std::string>(ConfigString,it.key());
+  }
+}
+
+
 #endif
