@@ -1,0 +1,2 @@
+/usr/bin/ar qc libRPAnalysisModule.a  CMakeFiles/RPAnalysisModule.dir/src/RPAnalysisModule.cu.o
+/usr/bin/ranlib libRPAnalysisModule.a

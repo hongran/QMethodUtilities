@@ -1,0 +1,37 @@
+[
+{
+  "directory": "/home/fanghan/GM2/gpuSim/qsim/build",
+  "command": "/usr/local/cuda-10.1/bin/nvcc   -I/home/fanghan/Downloads/root-6.20.00/build_dir/include -I/home/fanghan/GM2/gpuSim/qsim/include -I/usr/local/cuda-10.1/targets/x86_64-linux/include  -arch=sm_30 -g   -x cu -dc /home/fanghan/GM2/gpuSim/qsim/src/QSim.cu -o CMakeFiles/QSim.dir/src/QSim.cu.o",
+  "file": "/home/fanghan/GM2/gpuSim/qsim/src/QSim.cu"
+},
+{
+  "directory": "/home/fanghan/GM2/gpuSim/qsim/build",
+  "command": "/usr/local/cuda-10.1/bin/nvcc   -I/home/fanghan/Downloads/root-6.20.00/build_dir/include -I/home/fanghan/GM2/gpuSim/qsim/include -I/usr/local/cuda-10.1/targets/x86_64-linux/include  -arch=sm_30 -g   -x cu -dc /home/fanghan/GM2/gpuSim/qsim/src/AnalyzerRegistration.cu -o CMakeFiles/AnalyzerRegistration.dir/src/AnalyzerRegistration.cu.o",
+  "file": "/home/fanghan/GM2/gpuSim/qsim/src/AnalyzerRegistration.cu"
+},
+{
+  "directory": "/home/fanghan/GM2/gpuSim/qsim/build",
+  "command": "/usr/bin/clang++-10   -I/home/fanghan/Downloads/root-6.20.00/build_dir/include -I/home/fanghan/GM2/gpuSim/qsim/include -I/usr/local/cuda-10.1/targets/x86_64-linux/include    -std=c++11 -pipe -fsigned-char -pthread -g   -o CMakeFiles/QSimulation.dir/src/QSimulation.cpp.o -c /home/fanghan/GM2/gpuSim/qsim/src/QSimulation.cpp",
+  "file": "/home/fanghan/GM2/gpuSim/qsim/src/QSimulation.cpp"
+},
+{
+  "directory": "/home/fanghan/GM2/gpuSim/qsim/build",
+  "command": "/usr/local/cuda-10.1/bin/nvcc   -I/home/fanghan/Downloads/root-6.20.00/build_dir/include -I/home/fanghan/GM2/gpuSim/qsim/include -I/usr/local/cuda-10.1/targets/x86_64-linux/include  -arch=sm_30 -g   -x cu -dc /home/fanghan/GM2/gpuSim/qsim/src/AnalysisModuleBase.cu -o CMakeFiles/AnalysisModuleBase.dir/src/AnalysisModuleBase.cu.o",
+  "file": "/home/fanghan/GM2/gpuSim/qsim/src/AnalysisModuleBase.cu"
+},
+{
+  "directory": "/home/fanghan/GM2/gpuSim/qsim/build",
+  "command": "/usr/local/cuda-10.1/bin/nvcc   -I/home/fanghan/Downloads/root-6.20.00/build_dir/include -I/home/fanghan/GM2/gpuSim/qsim/include -I/usr/local/cuda-10.1/targets/x86_64-linux/include  -arch=sm_30 -g   -x cu -c /home/fanghan/GM2/gpuSim/qsim/src/RHAnalysisModule.cu -o CMakeFiles/RHAnalysisModule.dir/src/RHAnalysisModule.cu.o",
+  "file": "/home/fanghan/GM2/gpuSim/qsim/src/RHAnalysisModule.cu"
+},
+{
+  "directory": "/home/fanghan/GM2/gpuSim/qsim/build",
+  "command": "/usr/local/cuda-10.1/bin/nvcc   -I/home/fanghan/Downloads/root-6.20.00/build_dir/include -I/home/fanghan/GM2/gpuSim/qsim/include -I/usr/local/cuda-10.1/targets/x86_64-linux/include  -arch=sm_30 -g   -x cu -c /home/fanghan/GM2/gpuSim/qsim/src/RPAnalysisModule.cu -o CMakeFiles/RPAnalysisModule.dir/src/RPAnalysisModule.cu.o",
+  "file": "/home/fanghan/GM2/gpuSim/qsim/src/RPAnalysisModule.cu"
+},
+{
+  "directory": "/home/fanghan/GM2/gpuSim/qsim/build",
+  "command": "/usr/local/cuda-10.1/bin/nvcc   -I/home/fanghan/Downloads/root-6.20.00/build_dir/include -I/home/fanghan/GM2/gpuSim/qsim/include -I/usr/local/cuda-10.1/targets/x86_64-linux/include  -arch=sm_30 -g   -x cu -c /home/fanghan/GM2/gpuSim/qsim/src/TruthAnalysisModule.cu -o CMakeFiles/TruthAnalysisModule.dir/src/TruthAnalysisModule.cu.o",
+  "file": "/home/fanghan/GM2/gpuSim/qsim/src/TruthAnalysisModule.cu"
+}
+]

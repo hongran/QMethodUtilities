@@ -1,0 +1,2 @@
+/usr/bin/ar qc libQSim.a  CMakeFiles/QSim.dir/src/QSim.cu.o
+/usr/bin/ranlib libQSim.a

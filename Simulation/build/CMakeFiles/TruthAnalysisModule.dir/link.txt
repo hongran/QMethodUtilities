@@ -1,0 +1,2 @@
+/usr/bin/ar qc libTruthAnalysisModule.a  CMakeFiles/TruthAnalysisModule.dir/src/TruthAnalysisModule.cu.o
+/usr/bin/ranlib libTruthAnalysisModule.a

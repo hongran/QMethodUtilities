@@ -1,0 +1,28 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../include/AnalysisModuleBase.h
+map
+-
+string
+-
+vector
+-
+Global.h
+../include/Global.h
+
+../include/Global.h
+
+/home/fanghan/GM2/gpuSim/qsim/src/AnalysisModuleBase.cu
+vector
+-
+string
+-
+AnalysisModuleBase.h
+/home/fanghan/GM2/gpuSim/qsim/src/AnalysisModuleBase.h
+
