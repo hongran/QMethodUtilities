@@ -1,2 +1,0 @@
-/usr/bin/ar qc libAnalyzerRegistration.a  CMakeFiles/AnalyzerRegistration.dir/src/AnalyzerRegistration.cu.o
-/usr/bin/ranlib libAnalyzerRegistration.a

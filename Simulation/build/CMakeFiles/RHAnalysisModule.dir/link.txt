@@ -1,2 +1,0 @@
-/usr/bin/ar qc libRHAnalysisModule.a  CMakeFiles/RHAnalysisModule.dir/src/RHAnalysisModule.cu.o
-/usr/bin/ranlib libRHAnalysisModule.a
