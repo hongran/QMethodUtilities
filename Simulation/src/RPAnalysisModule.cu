@@ -87,6 +87,7 @@ __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
           for (int jADC = wndw; jADC < 2 * wndw; jADC++) {
             ysum += FlushQArray[idx + jADC + gap - wndw + 1] * mask[jADC];
           }
+	  
           yavg = ysum / (2.0 * wndw - 1);
           double ydiff = FlushQArray[idx] - yavg;
           AnaPedArray[idx] = yavg;
