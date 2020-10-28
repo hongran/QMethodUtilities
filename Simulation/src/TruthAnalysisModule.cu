@@ -21,6 +21,12 @@ __global__ void flush_analysis(float *FlushQTruthArray, float *AnaQArray,
     for (int idx = 0; idx < NSEG * flush_buffer_max_length; idx++) {
       int flushoffset = iflush * NSEG * flush_buffer_max_length;
       AnaQArray[flushoffset + idx] += FlushQTruthArray[flushoffset + idx];
+      /*
+      if (iflush > 20000)
+      {
+	printf("%d\n",idx);
+      }
+      */
     }
   }
 }
