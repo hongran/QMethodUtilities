@@ -13,6 +13,7 @@ __global__ void flush_analysis(float *FlushQTruthArray, float *AnaQArray,
                                float *AnalysisParameters) {
   int flush_buffer_max_length = AnalysisIntParameters[1];
   int nFlushesPerBatch = AnalysisIntParameters[0];
+  float threshold = AnalysisParameters[0];
 
   // thread index
   int iflush = blockIdx.x * blockDim.x + threadIdx.x;
@@ -20,7 +21,10 @@ __global__ void flush_analysis(float *FlushQTruthArray, float *AnaQArray,
   if (iflush < nFlushesPerBatch) {
     for (int idx = 0; idx < NSEG * flush_buffer_max_length; idx++) {
       int flushoffset = iflush * NSEG * flush_buffer_max_length;
-      AnaQArray[flushoffset + idx] += FlushQTruthArray[flushoffset + idx];
+      float qdata= FlushQTruthArray[flushoffset + idx];
+      if(qdata > threshold){
+        AnaQArray[flushoffset + idx] += qdata;
+      }
       /*
       if (iflush > 20000)
       {
@@ -145,11 +149,10 @@ int TruthAnalysisModule::Output(int RunNumber) {
 
 // Private Functions
 int TruthAnalysisModule::InitParameters() {
-  // AnalysisParameters.resize(1);
+  AnalysisParameters.resize(1);
   AnalysisIntParameters.resize(2);
 
-  // AnalysisParameters[0] = FloatParameters["Threshold"];
-
+  AnalysisParameters[0] = FloatParameters["Threshold"];
   AnalysisIntParameters[0] = IntParameters["NFlushesPerBatch"];
   AnalysisIntParameters[1] = IntParameters["FillBufferMaxLength"];
   // AnalysisIntParameters[2] = IntParameters["Window"];

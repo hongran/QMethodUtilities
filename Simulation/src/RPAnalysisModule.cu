@@ -112,12 +112,8 @@ __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
           }
 	  
           yavg = ysum / (2.0 * wndw - 1);
-<<<<<<< HEAD
-          float ydiff = FlushQArray[idx] - yavg;
-=======
           //float ydiff = FlushQArray[idx] - yavg;
           float ydiff = InputBuffer[wndw+gap] - yavg;
->>>>>>> 44a716ac0e3ec94ad6709082d94968a19a774f9d
           AnaPedArray[idx] = yavg;
 	  
           if (ydiff > threshold) {
