@@ -30,6 +30,12 @@ __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
         for (int iADC = gap + wndw;
              iADC < flush_buffer_max_length - gap - wndw - 1; iADC++) {
           int idx = flushoffset + xysegmentoffset + iADC;
+	  float InputBuffer[32];
+	  int BufferStartIdx = iADC - gap - wndw;
+	  for (int kADC = iADC - gap - wndw; kADC < iADC + gap + wndw + 1;kADC++)
+	  {
+	    InputBuffer[kADC-BufferStartIdx] = FlushQArray[kADC - iADC + idx];
+	  }
 
           float ysum = 0, yavg = 0;
           // find the mask base on rejection logic: yi - sum(y k!=i)/5 >
@@ -42,17 +48,24 @@ __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
                  kADC++) {
               if (kADC != jADC + iADC - wndw - gap) {
                 if (kADC - iADC + gap < 0)
-                  ysum += FlushQArray[kADC - iADC + idx];
+                  //ysum += FlushQArray[kADC - iADC + idx];
+                  ysum += InputBuffer[kADC-BufferStartIdx];
 
                 if (kADC - iADC - gap > 0)
-                  ysum += FlushQArray[kADC - iADC + idx];
+                  //ysum += FlushQArray[kADC - iADC + idx];
+                  ysum += InputBuffer[kADC-BufferStartIdx];
               }
             }
 
             yavg = ysum / (2.0 * wndw - 1);
 
             // reject the sample above threshold in the pedestal region.
+	    /*
             if (FlushQArray[jADC + idx - wndw - gap] - yavg > threshold) {
+              mask[jADC] = 0;
+            }
+	    */
+            if (InputBuffer[jADC] - yavg > threshold) {
               mask[jADC] = 0;
             }
           } // End of samples in the window region left to the trigger sample.
@@ -64,32 +77,49 @@ __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
                  kADC++) {
               if (kADC != jADC + iADC - wndw + gap + 1) {
                 if (kADC - iADC + gap < 0)
-                  ysum += FlushQArray[kADC - iADC + idx];
+                  //ysum += FlushQArray[kADC - iADC + idx];
+                  ysum += InputBuffer[kADC-BufferStartIdx];
 
                 if (kADC - iADC - gap > 0)
-                  ysum += FlushQArray[kADC - iADC + idx];
+                  //ysum += FlushQArray[kADC - iADC + idx];
+                  ysum += InputBuffer[kADC-BufferStartIdx];
               }
             }
 
             yavg = ysum / (2.0 * wndw - 1);
 
             // reject the sample above threshold in the pedestal region.
+	    /*
             if (FlushQArray[jADC + idx - wndw + gap + 1] - yavg > threshold) {
+              mask[jADC] = 0;
+            }
+	    */
+            if (InputBuffer[jADC + 2*gap + 1] - yavg > threshold) {
               mask[jADC] = 0;
             }
           } // End of samples in the window region right to the trigger sample.
 
           // compute the pileup corrected pedestal
           ysum = 0;
+	  
           for (int jADC = 0; jADC < wndw; jADC++) {
-            ysum += FlushQArray[idx + jADC - gap - wndw] * mask[jADC];
+            //ysum += FlushQArray[idx + jADC - gap - wndw] * mask[jADC];
+            ysum +=  InputBuffer[jADC] * mask[jADC];
           }
           for (int jADC = wndw; jADC < 2 * wndw; jADC++) {
-            ysum += FlushQArray[idx + jADC + gap - wndw + 1] * mask[jADC];
+            //ysum += FlushQArray[idx + jADC + gap - wndw + 1] * mask[jADC];
+            ysum += InputBuffer[jADC + 2*gap + 1] * mask[jADC];
           }
+	  
           yavg = ysum / (2.0 * wndw - 1);
+<<<<<<< HEAD
           float ydiff = FlushQArray[idx] - yavg;
+=======
+          //float ydiff = FlushQArray[idx] - yavg;
+          float ydiff = InputBuffer[wndw+gap] - yavg;
+>>>>>>> 44a716ac0e3ec94ad6709082d94968a19a774f9d
           AnaPedArray[idx] = yavg;
+	  
           if (ydiff > threshold) {
             AnaQArray[idx] += ydiff;
             // // fill the q2dArr
@@ -97,6 +127,7 @@ __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
             // int iRow = __double2int_rd(ydiff + 1000) % 420;
             // q2dArr[iRow * nBins + iCol] += 1;
           }
+	  
         }
       }
     }

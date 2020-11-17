@@ -2,10 +2,16 @@ cmake_minimum_required(VERSION 3.10)
 
 # set the project name
 project(qsim CUDA CXX)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(ROOT REQUIRED)
 find_package(CUDA)
+
 include(${ROOT_USE_FILE})
 include_directories(include ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+
 # add the executable
 add_executable(QSimulation src/QSimulation.cpp src/AnalyzerRegistration.cu src/AnalysisModuleBase.cu src/RHAnalysisModule.cu src/RPAnalysisModule.cu src/TruthAnalysisModule.cu src/QSim.cu) 
 # add_library(AnalyzerRegistration  src/AnalyzerRegistration.cu)
@@ -22,3 +28,4 @@ add_executable(QSimulation src/QSimulation.cpp src/AnalyzerRegistration.cu src/A
 # target_link_libraries(QSimulation ${ROOT_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} ${CUDA_LIBRARIES} AnalyzerRegistration AnalysisModuleBase QSim RHAnalysisModule RPAnalysisModule TruthAnalysisModule) 
 # target_link_libraries(QSimulation ${ROOT_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} ${CUDA_LIBRARIES} AnalyzerRegistration AnalysisModuleBase QSim RHAnalysisModule RPAnalysisModule TruthAnalysisModule) 
 target_link_libraries(QSimulation ${ROOT_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} ${CUDA_LIBRARIES}) 
+
