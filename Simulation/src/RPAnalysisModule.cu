@@ -31,7 +31,7 @@ __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
              iADC < flush_buffer_max_length - gap - wndw - 1; iADC++) {
           int idx = flushoffset + xysegmentoffset + iADC;
 
-          double ysum = 0, yavg = 0;
+          float ysum = 0, yavg = 0;
           // find the mask base on rejection logic: yi - sum(y k!=i)/5 >
           // threshold
           int mask[8] = {1, 1, 1, 1, 1, 1, 1, 1};
@@ -88,7 +88,7 @@ __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
             ysum += FlushQArray[idx + jADC + gap - wndw + 1] * mask[jADC];
           }
           yavg = ysum / (2.0 * wndw - 1);
-          double ydiff = FlushQArray[idx] - yavg;
+          float ydiff = FlushQArray[idx] - yavg;
           AnaPedArray[idx] = yavg;
           if (ydiff > threshold) {
             AnaQArray[idx] += ydiff;
