@@ -15,7 +15,7 @@ __global__ void init_rand(curandState *state, unsigned long long offset,
                           unsigned long long seed) {
 
   // thread index
-  int idx = blockIdx.x * 256 + threadIdx.x;
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   curand_init(seed, idx, 0, &state[idx]);
 }
@@ -26,7 +26,7 @@ GPU kernel utility function to initialize fill/flush data arrays
 __global__ void zero_int_array(int32_t *array, int length) {
 
   // thread index
-  int idx = blockIdx.x * 256 + threadIdx.x;
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (idx < length)
     *(array + idx) = 0;
@@ -38,7 +38,7 @@ GPU kernel utility function to initialize fill/flush data arrays
 __global__ void zero_float_array(float *array, int length) {
 
   // thread index
-  int idx = blockIdx.x * 256 + threadIdx.x;
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < length) {
     *(array + idx) = 0.0;
   }
@@ -50,7 +50,7 @@ GPU kernel user function to build uniform time distribution
 __global__ void make_rand(curandState *state, float *randArray) {
 
   // thread index
-  int idx = blockIdx.x * 256 + threadIdx.x;
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
   curandState localState = state[idx];
   randArray[idx] = curand_uniform(&localState);
