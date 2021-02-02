@@ -22,8 +22,8 @@
     "String Parameters": {
       "Pulse Shape": "Template",
       "Pedestal Shape": "Flat",
-      "Pulse Template Path": "/home/fanghan/GM2/QMethodUtilities/Simulation/templates",
-      "Pedestal Template Path": "/home/fanghan/GM2/QMethodUtilities/Simulation/templates"
+      "Pulse Template Path": "../templates",
+      "Pedestal Template Path": "../templates"
     }
   },
   "Analyzers": [
