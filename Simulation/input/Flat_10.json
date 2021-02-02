@@ -30,7 +30,7 @@
         "NThreadsPerBlock": 128
       },
       "Float Parameters": {
-        "Threshold": 0.0
+        "Threshold": 10.0
       },
       "String Parameters": {}
     },
@@ -43,7 +43,7 @@
         "Gap": 2
       },
       "Float Parameters": {
-        "Threshold": 0.0
+        "Threshold": 10.0
       },
       "String Parameters": {}
     }

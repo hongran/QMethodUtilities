@@ -9,11 +9,15 @@
       "TemplateZero": 200,
       "FillNoiseSwitch": 0,
       "FlashGainSagSwitch": 0,
-      "AccumulateMode": 0
+      "AccumulateMode": 0,
+      "TimeDiagnostics": 0
     },
     "Float Parameters": {
       "Omega_a": 1.43e-3,
-      "Noise": 0.0
+      "Noise": 0.0,
+      "Elab": 2.0,
+      "Sigma_X": 0.01,
+      "Sigma_Y": 0.01
     },
     "String Parameters": {
       "Pulse Shape": "Template",
@@ -25,9 +29,10 @@
   "Analyzers": [
     {
       "Name": "TruthAnalysis",
-      "Enable": true,
+      "Enable": false,
       "Integer Parameters": {
-        "NThreadsPerBlock": 128
+        "NThreadsPerBlock": 128,
+        "FillBufferMaxLength": 4500
       },
       "Float Parameters": {
         "Threshold": 0.0
@@ -35,12 +40,13 @@
       "String Parameters": {}
     },
     {
-      "Name": "RPAnalysis",
+      "Name": "EnergyHistogram",
       "Enable": true,
       "Integer Parameters": {
         "NThreadsPerBlock": 128,
-        "Window": 4,
-        "Gap": 2
+        "FillBufferMaxLength": 4500,
+        "ADCBinWidth": 1,
+        "LowADCCut": 0
       },
       "Float Parameters": {
         "Threshold": 0.0

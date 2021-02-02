@@ -96,7 +96,7 @@ __global__ void make_randfill(curandState *state, float *pulseTemplate,
   bool flashgainsag = SimulationIntParameters[8];
 
   float noise = SimulationParameters[1];
-
+  float fixedElab = SimulationParameters[2];
   // single thread make complete fill with NElectronsPerFill electrons
 
   const float tau = 6.4e4; // muon time-dilated lifetime (ns)
@@ -166,10 +166,10 @@ __global__ void make_randfill(curandState *state, float *pulseTemplate,
     curandState localState = state[idx];
 
     // make noise for each fill if fillnoise true (time consuming)
-    if (fillnoise) {
-      ;
-      // TODO add noise fill by fill
-    } // end if fill-by-fill noise
+    // if (fillnoise) {
+    //   ;
+    //   // TODO add noise fill by fill
+    // } // end if fill-by-fill noise
 
     int nhit = 0;    // hit counter
     float theta = 0; // decay angle
@@ -214,6 +214,9 @@ __global__ void make_randfill(curandState *state, float *pulseTemplate,
         continue;
       float Elab = Elab_max * y;
 
+      if (fixedElab > 0) {
+        Elab = fixedElab;
+      }
       // account for acceptance of calorimeter using empirical, energy-dependent
       // calo acceptance
 
@@ -306,38 +309,17 @@ __global__ void make_randfill(curandState *state, float *pulseTemplate,
     // (Elab / ADC), x/y coordinates (xcoord / ycoord) of positron with
     // empirical acceptance, (x,y) distributions
 
-    // TODO sort array of positron hits into ascending time-order
-    /*
-    int itemp;
-    float ftemp;
-    */
-    // TODO: deal with pile up study later
-    //     thrust::sort(thrust::seq, tickstore, tickstore+nhit);
-    /*
-    for (int i = 0; i < nhit; ++i) {
-      for (int j = i + 1; j < nhit; ++j) {
-              if (tickstore[i] > tickstore[j]) { // if higher index array
-    element j is earlier (t_j < t_i) than lower index  array element i then swap
-    elements ftemp = tickstore[i]; // swap times if hit i is later than hit j
-                tickstore[i] = tickstore[j];
-                tickstore[j] = ftemp;
-                itemp = iold[i]; // swap indexes if hit i is later than hit j
-                iold[i] = iold[j];
-                iold[j] = itemp;
-              }
-      }
-    }
-    */
-
     // parameters for empirical Gaussian distribution of energy across
     // neighboring segments.
 
     // https://muon.npl.washington.edu/elog/g2/SLAC+Test+Beam+2016/260 and
     // position where energy in neighboring xtal is 16% (1 sigma) - giving sigma
     // = 0.19 in units of crystal size
-    // float xsig = 0.01, ysig = 0.01; // test with very small spread
+    float xsig = SimulationParameters[3], ysig = SimulationParameters[4];
+    // test with very small spread
+    // float xsig = 0.01, ysig = 0.01;
     // float xsig = 0.5, ysig = 0.5; // test with very large spread
-    float xsig = 0.19, ysig = 0.19; // stanard  distribtion, xtal size units
+    // float xsig = 0.19, ysig = 0.19; // stanard  distribtion, xtal size units
 
     // parameters for distributing the ADC counts over time bins of q-method
     // histogram
@@ -346,7 +328,7 @@ __global__ void make_randfill(curandState *state, float *pulseTemplate,
 
     for (int i = 0; i < nhit; i++) { // loop over hits
 
-      tick = tickstore[i];
+      tick = tickstore[i]; // in the unit of qBin, qBin width is 75 ns
       ADC = ADCstore[i];
       xcoord = xcoordstore[i];
       ycoord = ycoordstore[i];
@@ -359,53 +341,81 @@ __global__ void make_randfill(curandState *state, float *pulseTemplate,
       //   gain sag from beam flash
 
       float ampFlashGainSag = 0.10, tauFlashGainSag = 1.0e5 / qBinSize;
+      flashgainsag = false;
       if (flashgainsag)
         ADC = ADC * (1.0 - ampFlashGainSag * exp(-tick / tauFlashGainSag));
 
       // need Qmethod bin and time within bin for distributing signal over bins
       // itick is bin of q-method time histogram
       // rtick is time within bin of q-method time histogram
-      int itick = (int)tick;
-      float rtick = tick - itick;
+      int itick = (int)tick;      // in the unit of qBin, integer part.
+      float rtick = tick - itick; // in the unit of qBin.
 
       // Time distribution
       float TimeBinFractions[5];
-      int TickEdgeIndex = int(TemplateZero - rtick * qBinSize * 10);
-      /*
-      //Diagnostics: Try first delta shape pulse
-      TimeBinFractions[0] = 0.0;
-      TimeBinFractions[1] = 1.0;
-      for (int tempIdx=2;tempIdx<5;tempIdx++)
-      {
+      for (int tempIdx = 0; tempIdx < 5; tempIdx++) {
         TimeBinFractions[tempIdx] = 0.0;
-      }*/
+      }
+      // TemplateZero in default should be 200, unit is 0.125 ns,
+      // so TemplateZero is 25 ns. The template
 
-      if (TickEdgeIndex > 0) {
-        TimeBinFractions[0] = pulseTemplate[TickEdgeIndex];
-      } else {
-        TimeBinFractions[0] = 0.0;
+      // int TickEdgeIndex = int(TemplateZero - rtick * qBinSize * 10);
+      // The unit of integrated pulse template is (raw adc bin)/10 = 0.125 ns
+      // We use this unit: (raw adc bin)/10 as base unit in the following:
+      int TickEdgeIndex = int(TemplateZero - rtick * TIMEDECIMATION * 10);
+
+      // Diagnostics: Try first delta shape pulse
+      if (SimulationIntParameters[9] == 1) {
+        TimeBinFractions[1] = 1.0;
       }
-      //      printf( "TemplateZero = %d tick= %f  itick= %d  rtick =%f
-      //      TickEdgeIndex = %d TimeBinFractions[0] = %f
-      //      \n",TemplateZero,tick,itick,rtick,TickEdgeIndex,TimeBinFractions[0]);
-      for (int tempIdx = 1; tempIdx < 5; tempIdx++) {
-        int leftIdx = TickEdgeIndex + (tempIdx - 1) * qBinSize * 10;
-        int rightIdx = TickEdgeIndex + tempIdx * qBinSize * 10;
-        if (leftIdx < 0) {
-          leftIdx = 0;
+      // End of Diagnostics.
+
+      // Pulse template based temporal energy distribution.
+      // else {
+      //   if (TickEdgeIndex > 0) {
+      //     TimeBinFractions[0] = pulseTemplate[TickEdgeIndex];
+      //   } else {
+      //     TimeBinFractions[0] = 0.0;
+      //   }
+
+      //   for (int tempIdx = 1; tempIdx < 5; tempIdx++) {
+      //     int leftIdx = TickEdgeIndex + (tempIdx - 1) * qBinSize * 10;
+      //     int rightIdx = TickEdgeIndex + tempIdx * qBinSize * 10;
+      //     if (leftIdx < 0) {
+      //       leftIdx = 0;
+      //     }
+      //     if (leftIdx >= TemplateSize) {
+      //       leftIdx = TemplateSize - 1;
+      //     }
+      //     if (rightIdx >= TemplateSize) {
+      //       rightIdx = TemplateSize - 1;
+      //     }
+      //     TimeBinFractions[tempIdx] =
+      //         pulseTemplate[rightIdx] - pulseTemplate[leftIdx];
+      //   }
+      // }
+      else {
+        int leftIdx = 160;
+        int rightIdx = int(160 + (1 - rtick) * TIMEDECIMATION * 10);
+        float FractionSum = 0;
+        for (int tempIdx = 0; tempIdx < 3; tempIdx++) {
+          TimeBinFractions[tempIdx] =
+              pulseTemplate[rightIdx] - pulseTemplate[leftIdx];
+
+          if (TimeBinFractions[tempIdx] > 0) {
+            FractionSum = FractionSum + TimeBinFractions[tempIdx];
+          }
+          leftIdx = rightIdx;
+          rightIdx = leftIdx + TIMEDECIMATION * 10;
         }
-        if (leftIdx >= TemplateSize) {
-          leftIdx = TemplateSize - 1;
+
+        for (int tempIdx = 0; tempIdx < 3; tempIdx++) {
+          TimeBinFractions[tempIdx] = TimeBinFractions[tempIdx] /
+          FractionSum;
         }
-        if (rightIdx >= TemplateSize) {
-          rightIdx = TemplateSize - 1;
-        }
-        TimeBinFractions[tempIdx] =
-            pulseTemplate[rightIdx] - pulseTemplate[leftIdx];
-        //	if(TimeBinFractions[tempIdx] < -0.3)printf("tempindex:%d ; left
-        //idx: %d ; right index: %d ; fraction
-        //%f\n",tempIdx,leftIdx,rightIdx,TimeBinFractions[tempIdx]);
       }
+
+      // End of temporal distribution.
 
       // we're now going to distribute the ADC signal accross x,y segments and
       // time bins filling the array fillSumArray of size time bins * xsegs *
@@ -440,6 +450,7 @@ __global__ void make_randfill(curandState *state, float *pulseTemplate,
 
           // Time distribution
           for (int k = 0; k < 5; k++) {
+            // for (int k = 0; k < 3; k++) {
             int kk = k + itick - 1;
             if (kk < 0 || kk >= fill_buffer_max_length)
               continue;
@@ -452,8 +463,8 @@ __global__ void make_randfill(curandState *state, float *pulseTemplate,
                 &(flushQTruthArray[iflush * nsegs * fill_buffer_max_length +
                                    xysegmentoffset + kk]),
                 ADCfrac /
-                    TIMEDECIMATION); // divide by time decimation to account for
-                                     // data processing calculates the
+                    TIMEDECIMATION); // divide by time decimation to account
+                                     // for data processing calculates the
                                      // time-decimated average not sum
             atomicAdd(
                 &(flushQArray[iflush * nsegs * fill_buffer_max_length +
@@ -472,22 +483,22 @@ __global__ void make_randfill(curandState *state, float *pulseTemplate,
     } // end of time-ordered hits hits
 
     // Add pedestal
-    for (int ix = 0; ix < nxseg; ix++) {
-      for (int iy = 0; iy < nyseg;
-           iy++) { // calc energy in segment (assume aGaussian distribution
-                   // about xc, yc)
-        // array offset needed for storing xtal hits in samples array
-        int xysegmentoffset = (ix + iy * nxseg) * fill_buffer_max_length;
+    // for (int ix = 0; ix < nxseg; ix++) {
+    //   for (int iy = 0; iy < nyseg;
+    //        iy++) { // calc energy in segment (assume aGaussian distribution
+    //                // about xc, yc)
+    //     // array offset needed for storing xtal hits in samples array
+    //     int xysegmentoffset = (ix + iy * nxseg) * fill_buffer_max_length;
 
-        for (int k = 35; k < fill_buffer_max_length; k++) {
-          atomicAdd(&(flushQArray[iflush * nsegs * fill_buffer_max_length +
-                                  xysegmentoffset + k]),
-                    pedestalTemplate[k]);
-        }
-        //	 printf("\n ");
+    //     for (int k = 35; k < fill_buffer_max_length; k++) {
+    //       atomicAdd(&(flushQArray[iflush * nsegs * fill_buffer_max_length +
+    //                               xysegmentoffset + k]),
+    //                 pedestalTemplate[k]);
+    //     }
+    //     //	 printf("\n ");
 
-      } // end of y-distribution loop
-    }   // end of x-distribution loop
+    //   } // end of y-distribution loop
+    // }   // end of x-distribution loop
 
     // state index for random number generator
     state[idx] = localState;
@@ -507,7 +518,7 @@ QSim::QSim(const std::map<std::string, int> &tIntParameters,
 
   // Additional Parameters
   IntParameters["FillBufferMaxLength"] = nsPerFill / qBinSize;
-  int deviceIdx=0;
+  int deviceIdx = 1;
   // Template
   if (StringParameters["Pulse Shape"].compare("Delta") == 0) {
     IntegratedPulseTemplate = std::vector<float>(IntParameters["TemplateSize"]);
@@ -555,7 +566,7 @@ QSim::QSim(const std::map<std::string, int> &tIntParameters,
 
   // Init Parameter Arrays
   InitParameters();
-  // cudaSetDevice(1);
+  // cudaSetDevice(deviceIdx);
   // Allocate Derive memory for parameters
 
   cudaMalloc((void **)&d_SimulationParameters,
@@ -594,7 +605,7 @@ QSim::QSim(const std::map<std::string, int> &tIntParameters,
 
   // get some cuda device properties
   cudaDeviceProp prop;
-  cudaGetDeviceProperties(&prop,deviceIdx);
+  cudaGetDeviceProperties(&prop, deviceIdx);
   printf("Device Number: %d\n", deviceIdx);
   printf("Device name: %s\n", prop.name);
   printf("Memory Clock Rate (KHz): %d\n", prop.memoryClockRate);
@@ -830,12 +841,16 @@ int QSim::GetCaloArray(std::string ArrayName, std::vector<double> &Output,
 
 // Private Functions
 int QSim::InitParameters() {
-  SimulationParameters.resize(2);
-  SimulationIntParameters.resize(9);
+  SimulationParameters.resize(5);
+  SimulationIntParameters.resize(10);
 
   SimulationParameters[0] = FloatParameters["Omega_a"];
   SimulationParameters[1] = FloatParameters["Noise"];
-
+  SimulationParameters[2] = FloatParameters["Elab"];
+  SimulationParameters[3] = FloatParameters["Sigma_X"];
+  SimulationParameters[4] = FloatParameters["Sigma_Y"];
+  // std::cout << "SimulationParameter[2]: " << SimulationParameters[2]
+  //           << std::endl;
   SimulationIntParameters[0] = IntParameters["NThreadsPerBlock"];
   SimulationIntParameters[1] = IntParameters["FillBufferMaxLength"];
   SimulationIntParameters[2] = IntParameters["NElectronsPerFill"];
@@ -845,7 +860,17 @@ int QSim::InitParameters() {
   SimulationIntParameters[6] = IntParameters["TemplateZero"];
   SimulationIntParameters[7] = IntParameters["FillNoiseSwitch"];
   SimulationIntParameters[8] = IntParameters["FlashGainSagSwitch"];
+  SimulationIntParameters[9] = IntParameters["TimeDiagnostics"];
 
+  std::cout << "Int Parameters:\n";
+  for (auto pair : IntParameters) {
+    std::cout << pair.first << ": " << pair.second << "\n";
+  }
+  std::cout << "\n";
+  std::cout << "Float Parameters:\n";
+  for (auto pair : FloatParameters) {
+    std::cout << pair.first << ": " << pair.second << "\n";
+  }
   return 0;
 }
 

@@ -16,7 +16,7 @@ include(${ROOT_USE_FILE})
 include_directories(include ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 # add the executable
-add_executable(QSimulation src/QSimulation.cpp src/AnalyzerRegistration.cu src/AnalysisModuleBase.cu src/RHAnalysisModule.cu src/RPAnalysisModule.cu src/TruthAnalysisModule.cu src/QSim.cu) 
+add_executable(QSimulation src/QSimulation.cpp src/AnalyzerRegistration.cu src/AnalysisModuleBase.cu src/RHAnalysisModule.cu src/RPAnalysisModule.cu src/TruthAnalysisModule.cu src/QSim.cu src/EnergyHistogramModule.cu) 
 # add_library(AnalyzerRegistration  src/AnalyzerRegistration.cu)
 # add_library(AnalysisModuleBase  src/AnalysisModuleBase.cu)
 # add_library(RHAnalysisModule OBJECT src/RHAnalysisModule.cu)

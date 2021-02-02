@@ -5,5 +5,6 @@
 #include "RHAnalysisModule.h"
 #include "RPAnalysisModule.h"
 #include "TruthAnalysisModule.h"
+#include "EnergyHistogramModule.h"
 
 #endif

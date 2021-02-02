@@ -34,7 +34,8 @@
 const int nsPerFill = 337500;
 const float nsPerTick = 1000./800.;
 const int qBinSize = TIMEDECIMATION*nsPerTick;
-const double GeVToADC = 1013.0*10; //The 10 is tuned by Ran Hong
+// const double GeVToADC = 1013.0*10; //The 10 is tuned by Ran Hong
+const double GeVToADC = 1013.0; //Remove 10 by Fang Han, fang.han@uky.edu
 const double PeakBinFrac = 0.4;
 
 const int nxseg = 9;

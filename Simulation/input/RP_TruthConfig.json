@@ -17,9 +17,9 @@
     },
     "String Parameters": {
       "Pulse Shape": "Template",
-      "Pedestal Shape": "Flat",
-      "Pulse Template Path": "/home/fanghan/GM2/QMethodUtilities/Simulation/templates",
-      "Pedestal Template Path": "/home/fanghan/GM2/QMethodUtilities/Simulation/templates"
+      "Pedestal Shape": "Template",
+      "Pulse Template Path": "/home/fanghan/GM2/QMethodUtilities/Simulation/templates/",
+      "Pedestal Template Path": "/home/fanghan/GM2/QMethodUtilities/Simulation/templates/"
     }
   },
   "Analyzers": [
@@ -41,6 +41,18 @@
         "NThreadsPerBlock": 128,
         "Window": 4,
         "Gap": 2
+      },
+      "Float Parameters": {
+        "Threshold": 0.0
+      },
+      "String Parameters": {}
+    },
+    {
+      "Name": "FFTAnalysis",
+      "Enable": false,
+      "Integer Parameters": {
+        "NThreadsPerBlock": 128,
+        "LowN": 500
       },
       "Float Parameters": {
         "Threshold": 0.0
