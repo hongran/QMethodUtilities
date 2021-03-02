@@ -107,7 +107,7 @@ int main(int argc, char ** argv)
 
     QSimulator.RegisterAnalysisModule(Name,AnaIntParameters,AnaFloatParameters,AnaStringParameters,IntParameters["NFlushesPerBatch"],nsPerFill/qBinSize);
   }
-
+  
   QSimulator.Simulate(NFlushes);
   
   std::cout <<"Starting output"<<std::endl;

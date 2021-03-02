@@ -659,6 +659,7 @@ QSim::~QSim() {
 int QSim::Simulate(int NFlushes) {
   cudaError err;
   int NSim = NFlushes / IntParameters["NFlushesPerBatch"] + 1;
+  std::cout <<"Starting Simulating "<<NSim <<" Flushes"<<std::endl;
   // Clean device memory
   for (auto it = ArraySizes.begin(); it != ArraySizes.end(); ++it) {
     auto Name = it->first;

@@ -4,7 +4,7 @@
       "NThreadsPerBlock": 512,
       "NElectronsPerFill": 20,
       "NFillsPerFlush": 1,
-      "NFlushesPerBatch": 1024,
+      "NFlushesPerBatch": 1,
       "TemplateSize": 2000,
       "TemplateZero": 200,
       "FillNoiseSwitch": 0,
@@ -29,8 +29,10 @@
   "Analyzers": [
     {
       "Name": "TruthAnalysis",
-      "Enable": false,
+      "Enable": true,
       "Integer Parameters": {
+        "NThreadsPerBlock": 512,
+        "FillBufferMaxLength": 4500
       },
       "Float Parameters": {
         "Threshold": 0.0

@@ -96,7 +96,7 @@ fft_adc_hist(cufftComplex *FFTQArray,
       for (int iseg = 0; iseg < NSEG; iseg++) {
         int segOffset = iseg * flush_buffer_max_length;
         int index = flushOffset + segOffset + i;
-        float signal = FFTQArray[index].x;
+        float signal = FFTQArray[index].x / (float)flush_buffer_max_length;
         if (signal < threshold) continue;
         sig_sum += signal;
         uint s_binIdx = __float2uint_rd((signal - lowECut) / EBinW);
