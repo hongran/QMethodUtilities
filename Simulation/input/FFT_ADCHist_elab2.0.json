@@ -39,10 +39,14 @@
     },
     {
       "Name": "RPAnalysis",
-      "Enable": false,
+      "Enable": true,
       "Integer Parameters": {
+        "NThreadsPerBlock": 512,
+        "FillBufferMaxLength": 4500,
         "Window": 4,
-        "Gap": 2
+        "Gap": 2,
+        "ADCBinWidth": 1,
+        "LowADCCut": 0
       },
       "Float Parameters": {
         "Threshold": 0.0
@@ -53,9 +57,25 @@
       "Name": "FFTAnalysis",
       "Enable": true,
       "Integer Parameters": {
-        "NThreadsPerBlock": 1024,
+        "NThreadsPerBlock": 512,
         "FillBufferMaxLength": 4500,
-        "LowN": 500
+        "LowN": 500,
+        "ADCBinWidth": 1,
+        "LowADCCut": 0
+      },
+      "Float Parameters": {
+        "Threshold": 0.0
+      },
+      "String Parameters": {}
+    },
+    {
+      "Name": "EnergyHistogram",
+      "Enable": true,
+      "Integer Parameters": {
+        "NThreadsPerBlock": 512,
+        "FillBufferMaxLength": 4500,
+        "ADCBinWidth": 1,
+        "LowADCCut": 0
       },
       "Float Parameters": {
         "Threshold": 0.0

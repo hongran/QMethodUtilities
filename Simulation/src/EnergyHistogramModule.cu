@@ -23,23 +23,6 @@ flush_adc_histogram(float *FlushHitArray, float *FlushQTruthArray,
   int iflush = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (iflush < nFlushesPerBatch) {
-    // int flushOffset = iflush * NSEG * flush_buffer_max_length;
-    // for (int i = 0; i < flush_buffer_max_length; i++) {
-    //   int fill_index = iflush * flush_buffer_max_length + i;
-    //   if (FlushHitArray[fill_index] > 0) {
-    //     float sig_sum = 0;
-    //     for (int iseg = 0; iseg < NSEG; iseg++) {
-    //       int segOffset = iseg * flush_buffer_max_length;
-    //       int index = flushOffset + segOffset + i;
-    //       float signal = FlushQTruthArray[index];
-    //       sig_sum += signal;
-    //       uint s_binIdx = __float2uint_rd((signal - lowECut) / EBinW);
-    //       atomicAdd(&S_ADCHistArray[s_binIdx], 1);
-    //     }
-    //     uint c_binIdx = __float2uint_rd((sig_sum - lowECut) / EBinW);
-    //     atomicAdd(&C_ADCHistArray[c_binIdx], 1);
-    //   }
-    // }
 
     int flushOffset = iflush * NSEG * flush_buffer_max_length;
     for (int i = 0; i < flush_buffer_max_length; i++) {
@@ -190,12 +173,13 @@ int EnergyHistogramModule::InitParameters() {
   AnalysisIntParameters.resize(4);
 
   AnalysisParameters[0] = FloatParameters["Threshold"];
-
   AnalysisIntParameters[0] = IntParameters["NFlushesPerBatch"];
   AnalysisIntParameters[1] = IntParameters["FillBufferMaxLength"];
   AnalysisIntParameters[2] = IntParameters["ADCBinWidth"];
   AnalysisIntParameters[3] = IntParameters["LowADCCut"];
-
+  for(auto item : AnalysisIntParameters){
+    std::cout<<"Parameter: "<<item <<std::endl;
+  }
   return 0;
 }
 

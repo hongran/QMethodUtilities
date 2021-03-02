@@ -9,23 +9,25 @@ int QSimulation::QSim::RegisterAnalysisModule(std::string ModuleName, const std:
   {
     AnalyzerHandle = new QAnalysis::RHAnalysisModule(ModuleName,tIntParameters,tFloatParameters,tStringParameters,nFlushesPerBatch, FillMaxLength);
   }
-  AnaModules[ModuleName] = AnalyzerHandle;
-
   if (ModuleName.compare("RPAnalysis")==0)
   {
     AnalyzerHandle = new QAnalysis::RPAnalysisModule(ModuleName,tIntParameters,tFloatParameters,tStringParameters,nFlushesPerBatch, FillMaxLength);
   }
-  AnaModules[ModuleName] = AnalyzerHandle;
+  if (ModuleName.compare("FFTAnalysis")==0)
+  {
+    AnalyzerHandle = new QAnalysis::FFTAnalysisModule(ModuleName,tIntParameters,tFloatParameters,tStringParameters,nFlushesPerBatch, FillMaxLength);
+  }
   
   if (ModuleName.compare("TruthAnalysis")==0)
   {
     AnalyzerHandle = new QAnalysis::TruthAnalysisModule(ModuleName,tIntParameters,tFloatParameters,tStringParameters,nFlushesPerBatch, FillMaxLength);
   }
-  AnaModules[ModuleName] = AnalyzerHandle;
+
   if (ModuleName.compare("EnergyHistogram")==0)
   {
     AnalyzerHandle = new QAnalysis::EnergyHistogramModule(ModuleName,tIntParameters,tFloatParameters,tStringParameters,nFlushesPerBatch, FillMaxLength);
   }
+  
   AnaModules[ModuleName] = AnalyzerHandle;
   return 0;
 }

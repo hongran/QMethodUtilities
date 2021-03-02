@@ -1,7 +1,7 @@
 {
   "Simulator": {
     "Integer Parameters": {
-      "NThreadsPerBlock": 512,
+      "NThreadsPerBlock": 1024,
       "NElectronsPerFill": 20,
       "NFillsPerFlush": 1,
       "NFlushesPerBatch": 1024,
@@ -15,7 +15,7 @@
     "Float Parameters": {
       "Omega_a": 1.43e-3,
       "Noise": 0.0,
-      "Elab": 2.0,
+      "Elab": 1.0,
       "Sigma_X": 0.19,
       "Sigma_Y": 0.19
     },
@@ -31,6 +31,8 @@
       "Name": "TruthAnalysis",
       "Enable": false,
       "Integer Parameters": {
+        "NThreadsPerBlock": 128,
+        "FillBufferMaxLength": 4500
       },
       "Float Parameters": {
         "Threshold": 0.0
@@ -38,24 +40,13 @@
       "String Parameters": {}
     },
     {
-      "Name": "RPAnalysis",
-      "Enable": false,
-      "Integer Parameters": {
-        "Window": 4,
-        "Gap": 2
-      },
-      "Float Parameters": {
-        "Threshold": 0.0
-      },
-      "String Parameters": {}
-    },
-    {
-      "Name": "FFTAnalysis",
+      "Name": "EnergyHistogram",
       "Enable": true,
       "Integer Parameters": {
         "NThreadsPerBlock": 1024,
         "FillBufferMaxLength": 4500,
-        "LowN": 500
+        "ADCBinWidth": 1,
+        "LowADCCut": 0
       },
       "Float Parameters": {
         "Threshold": 0.0

@@ -53,19 +53,57 @@ __global__ void sum_flushes(float *FlushQ, cufftComplex *FlushFFTQ,
                             float *AnaQArray, float *AnaPedArray,
                             int *AnalysisIntParameters,
                             float *AnalysisParameters) {
+
   int flush_buffer_max_length = AnalysisIntParameters[1];
   int nFlushesPerBatch = AnalysisIntParameters[0];
-
+  float threshold = AnalysisParameters[0];
+  
   // thread index
   int iflush = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (iflush < nFlushesPerBatch) {
     for (int idx = 0; idx < NSEG * flush_buffer_max_length; idx++) {
       int flushoffset = iflush * NSEG * flush_buffer_max_length;
-      auto fftvalue =
+      auto signal =
           FlushFFTQ[flushoffset + idx].x / (float)flush_buffer_max_length;
-      AnaQArray[flushoffset + idx] += fftvalue;
-      AnaPedArray[flushoffset + idx] += FlushQ[flushoffset + idx] - fftvalue;
+      if (signal < threshold) continue;
+      AnaQArray[flushoffset + idx] += signal;
+      AnaPedArray[flushoffset + idx] += FlushQ[flushoffset + idx] - signal;
+    }
+  }
+}
+// Histogram FFT method processed ADCs
+__global__ void
+fft_adc_hist(cufftComplex *FFTQArray,
+             float *S_ADCHistArray, float *C_ADCHistArray,
+             int *AnalysisIntParameters, float *AnalysisParameters) 
+{
+  int flush_buffer_max_length = AnalysisIntParameters[1];
+  int nFlushesPerBatch = AnalysisIntParameters[0];
+  float threshold = AnalysisParameters[0];
+  // Energy bin width.
+  int EBinW = AnalysisIntParameters[2];
+  // Low energy cut in energy in ADC histogram.
+  int lowECut = AnalysisIntParameters[3];
+
+  // thread index
+  int iflush = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (iflush < nFlushesPerBatch) {
+    int flushOffset = iflush * NSEG * flush_buffer_max_length;
+    for (int i = 0; i < flush_buffer_max_length; i++) {
+      float sig_sum = 0;
+      for (int iseg = 0; iseg < NSEG; iseg++) {
+        int segOffset = iseg * flush_buffer_max_length;
+        int index = flushOffset + segOffset + i;
+        float signal = FFTQArray[index].x;
+        if (signal < threshold) continue;
+        sig_sum += signal;
+        uint s_binIdx = __float2uint_rd((signal - lowECut) / EBinW);
+        atomicAdd(&S_ADCHistArray[s_binIdx], 1);
+      }
+      uint c_binIdx = __float2uint_rd((sig_sum - lowECut) / EBinW);
+      atomicAdd(&C_ADCHistArray[c_binIdx], 1);
     }
   }
 }
@@ -78,6 +116,8 @@ FFTAnalysisModule::FFTAnalysisModule(
     int nFlushesPerBatch, int FillMaxLength)
     : AnalysisModule(Name, tIntParameters, tFloatParameters,
                      tStringParameters) {
+
+  std::cout<<"Constructing FFTAnalysisModule..."<<std::endl;
   // Initialize the parameter arrays
   IntParameters["NFlushesPerBatch"] = nFlushesPerBatch;
   IntParameters["FillBufferMaxLength"] = FillMaxLength;
@@ -101,7 +141,8 @@ FFTAnalysisModule::FFTAnalysisModule(
       nFlushesPerBatch * NSEG * FillMaxLength * sizeof(float);
   ArraySizes["AnaPedArray"] =
       nFlushesPerBatch * NSEG * FillMaxLength * sizeof(float);
-
+  ArraySizes["FFTSegmADCHistArray"] = 1000 * sizeof(float);
+  ArraySizes["FFTCaloADCHistArray"] = 1000 * sizeof(float);
   // Allocate memories
   for (auto it = ArraySizes.begin(); it != ArraySizes.end(); ++it) {
     auto Name = it->first;
@@ -113,7 +154,7 @@ FFTAnalysisModule::FFTAnalysisModule(
   int mem_size = sizeof(cufftComplex) * nFlushesPerBatch * NSEG * FillMaxLength;
 
   // Allocate device memory for signal
-  checkCudaErrors(cudaMalloc((void **)&FFTArrays["FlushFFT"], mem_size));
+  checkCudaErrors(cudaMalloc((void **)&d_FFTArray, mem_size));
 
   int rank = 1;
   int idist = FillMaxLength;
@@ -146,18 +187,21 @@ int FFTAnalysisModule::FlushAnalysis(
   HANDLE_ERROR(cudaEventRecord(start, 0));
 
   init_fftArray<<<nblocks, IntParameters["NThreadsPerBlock"]>>>(
-      (*SimulatorDeviceArrays)["FlushQArray"], FFTArrays["FlushFFT"],
+      (*SimulatorDeviceArrays)["FlushQArray"], d_FFTArray,
       d_AnalysisIntParameters);
 
-  checkCudaErrors(cufftExecC2C(fftPlan, FFTArrays["FlushFFT"],
-                               FFTArrays["FlushFFT"], CUFFT_FORWARD));
+  checkCudaErrors(cufftExecC2C(fftPlan, d_FFTArray,
+                               d_FFTArray, CUFFT_FORWARD));
   apply_mask<<<nblocks, IntParameters["NThreadsPerBlock"]>>>(
-      FFTArrays["FlushFFT"], d_AnalysisIntParameters);
-  checkCudaErrors(cufftExecC2C(fftPlan, FFTArrays["FlushFFT"],
-                               FFTArrays["FlushFFT"], CUFFT_INVERSE));
-
+    d_FFTArray, d_AnalysisIntParameters);
+  checkCudaErrors(cufftExecC2C(fftPlan, d_FFTArray,
+    d_FFTArray, CUFFT_INVERSE));
+  fft_adc_hist<<<nblocks, IntParameters["NThreadsPerBlock"]>>>(
+    d_FFTArray,DeviceArrays["FFTSegmADCHistArray"], 
+    DeviceArrays["FFTCaloADCHistArray"], d_AnalysisIntParameters, 
+    d_AnalysisParameters);
   sum_flushes<<<nblocks, IntParameters["NThreadsPerBlock"]>>>(
-      (*SimulatorDeviceArrays)["FlushQArray"], FFTArrays["FlushFFT"],
+      (*SimulatorDeviceArrays)["FlushQArray"], d_FFTArray,
       DeviceArrays["AnaQArray"], DeviceArrays["AnaPedArray"],
       d_AnalysisIntParameters, d_AnalysisParameters);
 
@@ -205,7 +249,7 @@ int FFTAnalysisModule::EndAnalysis(
   return 0;
 }
 
-int FFTAnalysisModule::Output(int RunNumber, int nFlush) {
+int FFTAnalysisModule::Output(int RunNumber) {
   std::vector<double> AnaQHist;
   std::vector<double> AnaPedHist;
   this->GetCaloArray("AnaQArray", AnaQHist);
@@ -213,22 +257,41 @@ int FFTAnalysisModule::Output(int RunNumber, int nFlush) {
 
   unsigned int N = AnaQHist.size();
 
-  TH1 *hAnaQ = new TH1D("AnaQHist", Form("AnaQHist %0d Flushes", nFlush), N, 0,
+  TH1 *hAnaQ = new TH1D("FFTQHist", "FFTQHist", N, 0,
                         N * 0.075);
   for (unsigned int i = 0; i < N; i++) {
     hAnaQ->SetBinContent(i, AnaQHist[i]);
   }
 
-  TH1 *hAnaPed = new TH1D("AnaPedHist", Form("AnaPedHist %0d Flushes", nFlush),
+  TH1 *hAnaPed = new TH1D("FFTPedHist", "FFTPedHist",
                           N, 0, N * 0.075);
   for (unsigned int i = 0; i < N; i++) {
     hAnaPed->SetBinContent(i, AnaPedHist[i]);
+  }
+
+  auto ptr1 = HostArrays["FFTSegmADCHistArray"];
+  auto ptr2 = HostArrays["FFTCaloADCHistArray"];
+  auto Size = ArraySizes["FFTSegmADCHistArray"] / sizeof(float);
+  int ADCBinW = IntParameters["ADCBinWidth"];
+  int lowADCCut = IntParameters["LowADCCut"];
+
+  TH1 *hSegmADC = new TH1D("FFT_Segm_ADC_Hist", "Segments ADC Distribution, FFT Method", Size,
+                           lowADCCut, lowADCCut + Size * ADCBinW);
+  for (unsigned int i = 0; i < Size; i++) {
+    hSegmADC->SetBinContent(i, ptr1[i]);
+  }
+  TH1 *hCaloADC = new TH1D("FFT_Calo_ADC_Hist", "Calorimeter ADC Distribution, FFT Method",
+                           Size, lowADCCut, lowADCCut + Size * ADCBinW);
+  for (unsigned int i = 0; i < Size; i++) {
+    hCaloADC->SetBinContent(i, ptr2[i]);
   }
 
   TFile *FileOut =
       new TFile(Form("FFTRootOut_%04d.root", RunNumber), "recreate");
   hAnaQ->Write();
   hAnaPed->Write();
+  hSegmADC->Write();
+  hCaloADC->Write();
   FileOut->Close();
 
   return 0;
@@ -244,8 +307,12 @@ int FFTAnalysisModule::InitParameters() {
   AnalysisIntParameters[0] = IntParameters["NFlushesPerBatch"];
   AnalysisIntParameters[1] = IntParameters["FillBufferMaxLength"];
   AnalysisIntParameters[2] = IntParameters["LowN"];
-  printf("LowN: %d\n", AnalysisIntParameters[2]);
-
+  AnalysisIntParameters[3] = IntParameters["ADCBinWidth"];
+  AnalysisIntParameters[4] = IntParameters["LowADCCut"];
+  std::cout<<"Threshold: "<<AnalysisParameters[0]<<std::endl;
+  std::cout<<"LowN: "<<AnalysisIntParameters[2]<<std::endl;
+  std::cout<<"ADCBinWidth: "<<AnalysisIntParameters[3]<<std::endl;
+  std::cout<<"LowADCCut: "<<AnalysisIntParameters[4]<<std::endl;
   return 0;
 }
 

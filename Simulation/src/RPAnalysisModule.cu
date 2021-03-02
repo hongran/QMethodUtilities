@@ -9,12 +9,17 @@
 
 // Analysis device kernel
 __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
-                               float *AnaPedArray, int *AnalysisIntParameters,
+                               float *AnaPedArray, float *S_ADCHistArray,
+                               float *C_ADCHistArray,
+                               int *AnalysisIntParameters,
                                float *AnalysisParameters) {
   int flush_buffer_max_length = AnalysisIntParameters[1];
   int nFlushesPerBatch = AnalysisIntParameters[0];
   int wndw = AnalysisIntParameters[2];
   int gap = AnalysisIntParameters[3];
+  int EBinW = AnalysisIntParameters[4];
+  // Low energy cut in energy in ADC histogram.
+  int lowECut = AnalysisIntParameters[5];
 
   float threshold = AnalysisParameters[0];
 
@@ -22,110 +27,96 @@ __global__ void flush_analysis(float *FlushQArray, float *AnaQArray,
   int iflush = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (iflush < nFlushesPerBatch) {
-    for (int ix = 0; ix < NXSEG; ix++) {
-      for (int iy = 0; iy < NYSEG; iy++) {
-        int flushoffset = iflush * NSEG * flush_buffer_max_length;
-        int xysegmentoffset = (ix + iy * NXSEG) * flush_buffer_max_length;
+    int flushoffset = iflush * NSEG * flush_buffer_max_length;
+    for (int iADC = gap + wndw; iADC < flush_buffer_max_length - gap - wndw - 1;
+         iADC++) {
+      float sig_sum = 0;
+      for (int iseg = 0; iseg < NSEG; iseg++) {
+        int segmentoffset = iseg * flush_buffer_max_length;
+        int idx = flushoffset + segmentoffset + iADC;
+        float InputBuffer[32];
+        int BufferStartIdx = iADC - gap - wndw;
+        for (int kADC = iADC - gap - wndw; kADC < iADC + gap + wndw + 1;
+             kADC++) {
+          InputBuffer[kADC - BufferStartIdx] = FlushQArray[kADC - iADC + idx];
+        }
 
-        for (int iADC = gap + wndw;
-             iADC < flush_buffer_max_length - gap - wndw - 1; iADC++) {
-          int idx = flushoffset + xysegmentoffset + iADC;
-	  float InputBuffer[32];
-	  int BufferStartIdx = iADC - gap - wndw;
-	  for (int kADC = iADC - gap - wndw; kADC < iADC + gap + wndw + 1;kADC++)
-	  {
-	    InputBuffer[kADC-BufferStartIdx] = FlushQArray[kADC - iADC + idx];
-	  }
-
-          float ysum = 0, yavg = 0;
-          // find the mask base on rejection logic: yi - sum(y k!=i)/5 >
-          // threshold
-          int mask[8] = {1, 1, 1, 1, 1, 1, 1, 1};
-          // For samples in the window region left to the trigger sample
-          for (int jADC = 0; jADC < wndw; jADC++) {
-            ysum = 0;
-            for (int kADC = iADC - gap - wndw; kADC < iADC + gap + wndw + 1;
-                 kADC++) {
-              if (kADC != jADC + iADC - wndw - gap) {
-                if (kADC - iADC + gap < 0)
-                  //ysum += FlushQArray[kADC - iADC + idx];
-                  ysum += InputBuffer[kADC-BufferStartIdx];
-
-                if (kADC - iADC - gap > 0)
-                  //ysum += FlushQArray[kADC - iADC + idx];
-                  ysum += InputBuffer[kADC-BufferStartIdx];
-              }
-            }
-
-            yavg = ysum / (2.0 * wndw - 1);
-
-            // reject the sample above threshold in the pedestal region.
-	    /*
-            if (FlushQArray[jADC + idx - wndw - gap] - yavg > threshold) {
-              mask[jADC] = 0;
-            }
-	    */
-            if (InputBuffer[jADC] - yavg > threshold) {
-              mask[jADC] = 0;
-            }
-          } // End of samples in the window region left to the trigger sample.
-
-          // For samples in the window region right to the trigger sample.
-          for (int jADC = wndw; jADC < 2 * wndw; jADC++) {
-            ysum = 0;
-            for (int kADC = iADC - gap - wndw; kADC < iADC + gap + wndw + 1;
-                 kADC++) {
-              if (kADC != jADC + iADC - wndw + gap + 1) {
-                if (kADC - iADC + gap < 0)
-                  //ysum += FlushQArray[kADC - iADC + idx];
-                  ysum += InputBuffer[kADC-BufferStartIdx];
-
-                if (kADC - iADC - gap > 0)
-                  //ysum += FlushQArray[kADC - iADC + idx];
-                  ysum += InputBuffer[kADC-BufferStartIdx];
-              }
-            }
-
-            yavg = ysum / (2.0 * wndw - 1);
-
-            // reject the sample above threshold in the pedestal region.
-	    /*
-            if (FlushQArray[jADC + idx - wndw + gap + 1] - yavg > threshold) {
-              mask[jADC] = 0;
-            }
-	    */
-            if (InputBuffer[jADC + 2*gap + 1] - yavg > threshold) {
-              mask[jADC] = 0;
-            }
-          } // End of samples in the window region right to the trigger sample.
-
-          // compute the pileup corrected pedestal
+        float ysum = 0, yavg = 0;
+        // find the mask base on rejection logic: yi - sum(y k!=i)/5 >
+        // threshold
+        int mask[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+        // For samples in the window region left to the trigger sample
+        for (int jADC = 0; jADC < wndw; jADC++) {
           ysum = 0;
-	  
-          for (int jADC = 0; jADC < wndw; jADC++) {
-            //ysum += FlushQArray[idx + jADC - gap - wndw] * mask[jADC];
-            ysum +=  InputBuffer[jADC] * mask[jADC];
+          for (int kADC = iADC - gap - wndw; kADC < iADC + gap + wndw + 1;
+               kADC++) {
+            if (kADC != jADC + iADC - wndw - gap) {
+              if (kADC - iADC + gap < 0)
+                // ysum += FlushQArray[kADC - iADC + idx];
+                ysum += InputBuffer[kADC - BufferStartIdx];
+
+              if (kADC - iADC - gap > 0)
+                // ysum += FlushQArray[kADC - iADC + idx];
+                ysum += InputBuffer[kADC - BufferStartIdx];
+            }
           }
-          for (int jADC = wndw; jADC < 2 * wndw; jADC++) {
-            //ysum += FlushQArray[idx + jADC + gap - wndw + 1] * mask[jADC];
-            ysum += InputBuffer[jADC + 2*gap + 1] * mask[jADC];
-          }
-	  
+
           yavg = ysum / (2.0 * wndw - 1);
-          //float ydiff = FlushQArray[idx] - yavg;
-          float ydiff = InputBuffer[wndw+gap] - yavg;
-          AnaPedArray[idx] = yavg;
-	  
-          if (ydiff > threshold) {
-            AnaQArray[idx] += ydiff;
-            // // fill the q2dArr
-            // int iCol = idx % nBins;
-            // int iRow = __double2int_rd(ydiff + 1000) % 420;
-            // q2dArr[iRow * nBins + iCol] += 1;
+
+          if (InputBuffer[jADC] - yavg > threshold) {
+            mask[jADC] = 0;
           }
-	  
+        } // End of samples in the window region left to the trigger sample.
+
+        // For samples in the window region right to the trigger sample.
+        for (int jADC = wndw; jADC < 2 * wndw; jADC++) {
+          ysum = 0;
+          for (int kADC = iADC - gap - wndw; kADC < iADC + gap + wndw + 1;
+               kADC++) {
+            if (kADC != jADC + iADC - wndw + gap + 1) {
+              if (kADC - iADC + gap < 0)
+                // ysum += FlushQArray[kADC - iADC + idx];
+                ysum += InputBuffer[kADC - BufferStartIdx];
+
+              if (kADC - iADC - gap > 0)
+                // ysum += FlushQArray[kADC - iADC + idx];
+                ysum += InputBuffer[kADC - BufferStartIdx];
+            }
+          }
+
+          yavg = ysum / (2.0 * wndw - 1);
+
+          if (InputBuffer[jADC + 2 * gap + 1] - yavg > threshold) {
+            mask[jADC] = 0;
+          }
+        } // End of samples in the window region right to the trigger sample.
+
+        // compute the pileup corrected pedestal
+        ysum = 0;
+
+        for (int jADC = 0; jADC < wndw; jADC++) {
+          // ysum += FlushQArray[idx + jADC - gap - wndw] * mask[jADC];
+          ysum += InputBuffer[jADC] * mask[jADC];
+        }
+        for (int jADC = wndw; jADC < 2 * wndw; jADC++) {
+          // ysum += FlushQArray[idx + jADC + gap - wndw + 1] * mask[jADC];
+          ysum += InputBuffer[jADC + 2 * gap + 1] * mask[jADC];
+        }
+
+        yavg = ysum / (2.0 * wndw - 1);
+        // float ydiff = FlushQArray[idx] - yavg;
+        float ydiff = InputBuffer[wndw + gap] - yavg;
+        AnaPedArray[idx] = yavg;
+
+        if (ydiff > threshold) {
+          AnaQArray[idx] += ydiff;
+          uint s_binIdx = __float2uint_rd((ydiff - lowECut) / EBinW);
+          atomicAdd(&S_ADCHistArray[s_binIdx], 1);
+          sig_sum += ydiff;
         }
       }
+      uint c_binIdx = __float2uint_rd((sig_sum - lowECut) / EBinW);
+      atomicAdd(&C_ADCHistArray[c_binIdx], 1);
     }
   }
 }
@@ -162,7 +153,8 @@ RPAnalysisModule::RPAnalysisModule(
       nFlushesPerBatch * NSEG * FillMaxLength * sizeof(float);
   ArraySizes["AnaPedArray"] =
       nFlushesPerBatch * NSEG * FillMaxLength * sizeof(float);
-
+  ArraySizes["RPSegmADCHistArray"] = 1000 * sizeof(float);
+  ArraySizes["RPCaloADCHistArray"] = 1000 * sizeof(float);
   // Allocate memories
   for (auto it = ArraySizes.begin(); it != ArraySizes.end(); ++it) {
     auto Name = it->first;
@@ -191,7 +183,8 @@ int RPAnalysisModule::FlushAnalysis(
 
   flush_analysis<<<nblocks, IntParameters["NThreadsPerBlock"]>>>(
       (*SimulatorDeviceArrays)["FlushQArray"], DeviceArrays["AnaQArray"],
-      DeviceArrays["AnaPedArray"], d_AnalysisIntParameters,
+      DeviceArrays["AnaPedArray"], DeviceArrays["RPSegmADCHistArray"], 
+      DeviceArrays["RPCaloADCHistArray"],d_AnalysisIntParameters,
       d_AnalysisParameters);
 
   HANDLE_ERROR(cudaEventRecord(stop, 0));
@@ -255,10 +248,28 @@ int RPAnalysisModule::Output(int RunNumber) {
     hAnaPed->SetBinContent(i, AnaPedHist[i]);
   }
 
+  auto ptr1 = HostArrays["RPSegmADCHistArray"];
+  auto ptr2 = HostArrays["RPCaloADCHistArray"];
+  auto Size = ArraySizes["RPSegmADCHistArray"] / sizeof(float);
+  int ADCBinW = IntParameters["ADCBinWidth"];
+  int lowADCCut = IntParameters["LowADCCut"];
+
+  TH1 *hSegmADC = new TH1D("RP_Segm_ADC_Hist", "Segments ADC Distribution, RP Method", Size,
+                           lowADCCut, lowADCCut + Size * ADCBinW);
+  for (unsigned int i = 0; i < Size; i++) {
+    hSegmADC->SetBinContent(i, ptr1[i]);
+  }
+  TH1 *hCaloADC = new TH1D("RP_Calo_ADC_Hist", "Calorimeter ADC Distribution, RP Method",
+                           Size, lowADCCut, lowADCCut + Size * ADCBinW);
+  for (unsigned int i = 0; i < Size; i++) {
+    hCaloADC->SetBinContent(i, ptr2[i]);
+  }
   TFile *FileOut =
       new TFile(Form("RPRootOut_%04d.root", RunNumber), "recreate");
   hAnaQ->Write();
   hAnaPed->Write();
+  hSegmADC->Write();
+  hCaloADC->Write();
   FileOut->Close();
 
   return 0;
@@ -267,7 +278,7 @@ int RPAnalysisModule::Output(int RunNumber) {
 // Private Functions
 int RPAnalysisModule::InitParameters() {
   AnalysisParameters.resize(1);
-  AnalysisIntParameters.resize(4);
+  AnalysisIntParameters.resize(6);
 
   AnalysisParameters[0] = FloatParameters["Threshold"];
 
@@ -275,7 +286,8 @@ int RPAnalysisModule::InitParameters() {
   AnalysisIntParameters[1] = IntParameters["FillBufferMaxLength"];
   AnalysisIntParameters[2] = IntParameters["Window"];
   AnalysisIntParameters[3] = IntParameters["Gap"];
-
+  AnalysisIntParameters[4] = IntParameters["ADCBinWidth"];
+  AnalysisIntParameters[5] = IntParameters["LowADCCut"];
   return 0;
 }
 

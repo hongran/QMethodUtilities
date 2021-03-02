@@ -29,14 +29,14 @@ public:
                     std::map<std::string, int> *SimulatorArraySizes) override;
   int EndAnalysis(std::map<std::string, float *> *SimulatorHostArrays,
                   std::map<std::string, int> *SimulatorArraySizes) override;
-  int Output(int RunNumber, int nFlush) override;
+  int Output(int RunNumber) override;
 
   int GetArray(std::string ArrayName, std::vector<double> &Output);
   int GetCaloArray(std::string ArrayName, std::vector<double> &Output,
                    bool BatchSum = true);
 
   cufftHandle fftPlan;
-  std::map<std::string, cufftComplex *> FFTArrays;
+  cufftComplex * d_FFTArray;
 
 protected:
   int InitParameters();
