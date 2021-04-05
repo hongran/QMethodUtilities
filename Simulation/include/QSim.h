@@ -31,7 +31,8 @@
 #define NTMAX 6    // max threshold histograms
 
 //constants
-const int nsPerFill = 337500;
+//const int nsPerFill = 337500;
+const int nsPerFill = 225000;
 const float nsPerTick = 1000./800.;
 const int qBinSize = TIMEDECIMATION*nsPerTick;
 // const double GeVToADC = 1013.0*10; //The 10 is tuned by Ran Hong

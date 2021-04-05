@@ -1,10 +1,10 @@
 {
   "Simulator": {
     "Integer Parameters": {
-      "NThreadsPerBlock": 512,
+      "NThreadsPerBlock": 128,
       "NElectronsPerFill": 20,
       "NFillsPerFlush": 1,
-      "NFlushesPerBatch": 1,
+      "NFlushesPerBatch": 128,
       "TemplateSize": 2000,
       "TemplateZero": 200,
       "FillNoiseSwitch": 0,
@@ -59,7 +59,7 @@
       "Name": "FFTAnalysis",
       "Enable": true,
       "Integer Parameters": {
-        "NThreadsPerBlock": 512,
+        "NThreadsPerBlock": 128,
         "FillBufferMaxLength": 4500,
         "LowN": 500,
         "ADCBinWidth": 1,
@@ -74,7 +74,7 @@
       "Name": "EnergyHistogram",
       "Enable": true,
       "Integer Parameters": {
-        "NThreadsPerBlock": 512,
+        "NThreadsPerBlock": 128,
         "FillBufferMaxLength": 4500,
         "ADCBinWidth": 1,
         "LowADCCut": 0

@@ -518,7 +518,8 @@ QSim::QSim(const std::map<std::string, int> &tIntParameters,
 
   // Additional Parameters
   IntParameters["FillBufferMaxLength"] = nsPerFill / qBinSize;
-  int deviceIdx = 0;
+  int deviceIdx = IntParameters["DeviceIdx"];
+  cudaSetDevice(deviceIdx);
   // Template
   if (StringParameters["Pulse Shape"].compare("Delta") == 0) {
     IntegratedPulseTemplate = std::vector<float>(IntParameters["TemplateSize"]);
@@ -566,7 +567,7 @@ QSim::QSim(const std::map<std::string, int> &tIntParameters,
 
   // Init Parameter Arrays
   InitParameters();
-  // cudaSetDevice(deviceIdx);
+  
   // Allocate Derive memory for parameters
 
   cudaMalloc((void **)&d_SimulationParameters,

@@ -1,0 +1,89 @@
+{
+  "Simulator": {
+    "Integer Parameters": {
+      "NThreadsPerBlock": 128,
+      "NElectronsPerFill": 20,
+      "NFillsPerFlush": 1,
+      "NFlushesPerBatch": 128,
+      "TemplateSize": 2000,
+      "TemplateZero": 200,
+      "FillNoiseSwitch": 0,
+      "FlashGainSagSwitch": 0,
+      "AccumulateMode": 0,
+      "TimeDiagnostics": 0,
+      "DeviceIdx": 1
+    },
+    "Float Parameters": {
+      "Omega_a": 1.43e-3,
+      "Noise": 0.0,
+      "Elab": 2.0,
+      "Sigma_X": 0.19,
+      "Sigma_Y": 0.19
+    },
+    "String Parameters": {
+      "Pulse Shape": "Template",
+      "Pedestal Shape": "Flat",
+      "Pulse Template Path": "../templates",
+      "Pedestal Template Path": "../templates"
+    }
+  },
+  "Analyzers": [
+    {
+      "Name": "TruthAnalysis",
+      "Enable": true,
+      "Integer Parameters": {
+        "NThreadsPerBlock": 128,
+        "FillBufferMaxLength": 3000
+      },
+      "Float Parameters": {
+        "Threshold": 0.0
+      },
+      "String Parameters": {}
+    },
+    {
+      "Name": "RPAnalysis",
+      "Enable": true,
+      "Integer Parameters": {
+        "NThreadsPerBlock": 128,
+        "FillBufferMaxLength": 3000,
+        "Window": 4,
+        "Gap": 2,
+        "ADCBinWidth": 1,
+        "LowADCCut": 0
+      },
+      "Float Parameters": {
+        "Threshold": 0.0
+      },
+      "String Parameters": {}
+    },
+    {
+      "Name": "FFTAnalysis",
+      "Enable": true,
+      "Integer Parameters": {
+        "NThreadsPerBlock": 128,
+        "FillBufferMaxLength": 3000,
+        "LowN": 0,
+        "ADCBinWidth": 1,
+        "LowADCCut": 0
+      },
+      "Float Parameters": {
+        "Threshold": 0.0
+      },
+      "String Parameters": {}
+    },
+    {
+      "Name": "EnergyHistogram",
+      "Enable": true,
+      "Integer Parameters": {
+        "NThreadsPerBlock": 128,
+        "FillBufferMaxLength": 3000,
+        "ADCBinWidth": 1,
+        "LowADCCut": 0
+      },
+      "Float Parameters": {
+        "Threshold": 0.0
+      },
+      "String Parameters": {}
+    }
+  ]
+}
